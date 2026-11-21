@@ -1,5 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +13,11 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Không thể đăng nhập."); return; }
-      setPassword(""); window.location.assign("/");
+      setPassword("");
+      // Authentication and application access are separate: new users need a role.
+      const access = await fetch("/api/products", { cache: "no-store" });
+      if (access.status === 403) { setError("Tài khoản đã đăng nhập nhưng chưa được cấp quyền. Vui lòng liên hệ quản trị viên."); return; }
+      window.location.assign("/");
     } catch { setError("Không thể kết nối. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }
@@ -23,6 +28,7 @@ export default function LoginPage() {
       <label className="block text-sm font-medium">Mật khẩu<input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       <button disabled={busy} className="w-full rounded-lg bg-blue-600 text-white p-2 disabled:opacity-50">{busy ? "Đang đăng nhập…" : "Đăng nhập"}</button>
+      <p className="text-sm text-slate-600">Chưa có tài khoản? <Link href="/register" className="text-blue-700">Đăng ký</Link></p>
     </form>
   </main>;
 }

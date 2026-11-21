@@ -19,3 +19,9 @@ Cần giữ Vercel Deployment Protection. Mã trong workspace chưa được tri
 ## Database
 
 Production hiện kết nối Adsmanager; người dùng đã chọn xây dựng trực tiếp tại đây. Preview/Development chưa được xác nhận tách biệt; dữ liệu và thay đổi schema có thể ảnh hưởng Production. Chưa tạo hoặc chuyển sang tài khoản PostgreSQL quyền tối thiểu. RLS ở bảng vai trò không bảo vệ API Next.js đang dùng kết nối PostgreSQL đặc quyền. Cần tạo tài khoản ứng dụng với tập quyền được kiểm thử và đổi `DATABASE_URL` một cách an toàn trước khi coi nhiệm vụ này hoàn tất.
+
+## Đăng ký công khai (cần cấu hình và kiểm thử trước khi sử dụng)
+
+Trang `/register` đăng ký qua Supabase Auth, yêu cầu xác minh email và không tự cấp vai trò. Với PKCE, mở email xác minh trên cùng trình duyệt đăng ký. Cấu hình Supabase Authentication → URL Configuration cho phép URL chính xác `https://<preview-host>/auth/callback` và URL production tương ứng trước khi kiểm thử; không mở wildcard rộng. Supabase phải bật email signup và xác minh email. Kiểm tra dịch vụ gửi mail/SMTP và hạn mức, đồng thời duy trì giới hạn đăng ký và chống lạm dụng; SMTP mặc định có thể không gửi được cho mọi người dùng. Deployment Protection sẽ tiếp tục chặn người chưa có quyền Vercel trước khi đến trang đăng ký; không tắt nếu chưa kiểm thử an ninh.
+
+Sau khi xác minh, quản trị viên phải cấp vai trò qua API quản lý vai trò; hiện chưa có giao diện quản trị người dùng. `APP_ADMIN_EMAIL` là quyền admin dựa trên email, nên cần bảo vệ email này, không xóa rồi để đăng ký lại, và chuyển sang gắn admin với user ID bất biến trước khi mở đăng ký rộng. Người dùng chưa được cấp quyền sẽ bị từ chối API. Chưa kiểm thử đăng ký/xác minh end-to-end bằng email thật hoặc thử rate limits.

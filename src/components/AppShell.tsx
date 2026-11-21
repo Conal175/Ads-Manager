@@ -72,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  if (pathname === "/login") return <>{children}</>;
+  if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth/")) return <>{children}</>;
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#f8fafc]">
