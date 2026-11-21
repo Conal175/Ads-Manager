@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Lock,
+  Users,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -59,6 +60,12 @@ const NAV_ITEMS = [
     label: "Trung tâm Đề xuất",
     shortDesc: "Kill, Scale, Fatigue, Leak",
     icon: Zap,
+  },
+  {
+    href: "/users",
+    label: "Quản lý người dùng",
+    shortDesc: "Cấp và thu hồi quyền",
+    icon: Users,
   },
   {
     href: "/system",
