@@ -1,0 +1,3 @@
+const http = require('node:http');
+const fakeUser = { id: '18ef842a-05b7-4dc6-bb87-742408c33511', aud: 'authenticated', role: 'authenticated', email: 'test-admin@example.invalid', email_confirmed_at: '2026-01-01T00:00:00Z', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' };
+http.createServer((req,res) => { if(req.url==='/auth/v1/user' && req.headers.authorization === 'Bearer fake-test-access-token') {res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(fakeUser));} else {res.writeHead(401,{'content-type':'application/json'});res.end(JSON.stringify({message:'Unauthorized'}));} }).listen(54321,'127.0.0.1',()=>console.log('fake auth listening'));
