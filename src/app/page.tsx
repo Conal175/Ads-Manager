@@ -110,6 +110,7 @@ interface DashboardData {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [showCompactJson, setShowCompactJson] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -118,7 +119,11 @@ export default function DashboardPage() {
     try {
       const res = await fetch("/api/dashboard");
       const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Không thể tải dữ liệu.");
       setData(json);
+      setLoadError(null);
+    } catch {
+      setLoadError("Không thể tải dữ liệu. Vui lòng kiểm tra kết nối cơ sở dữ liệu rồi thử lại.");
     } finally {
       setLoading(false);
     }
@@ -137,11 +142,19 @@ export default function DashboardPage() {
       if (res.ok) {
         setToast(json.message || "Đã tạo mới Bản tin AI Briefing.");
         await loadDashboard();
+      } else {
+        setToast(json.error || "Không thể tạo bản tin AI.");
       }
+    } catch {
+      setToast("Không thể kết nối để tạo bản tin AI.");
     } finally {
       setRegenerating(false);
     }
   };
+
+  if (!loading && (loadError || !data)) {
+    return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800">{loadError || "Không có dữ liệu."} <button className="ml-2 underline" onClick={() => { setLoading(true); void loadDashboard(); }}>Thử lại</button></div>;
+  }
 
   if (loading || !data) {
     return (
