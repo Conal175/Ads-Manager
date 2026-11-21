@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { systemSettings } from "@/db/schema";
@@ -10,6 +11,8 @@ import { verifyAiConnection } from "@/services/gemini-ai";
 import type { ConnectionStatusResult } from "@/types/domain";
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const { service } = (await req.json()) as {

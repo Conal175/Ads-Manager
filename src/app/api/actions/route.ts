@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { actionRecommendations, systemSettings } from "@/db/schema";
@@ -6,6 +7,8 @@ import { ensureSeeded } from "@/lib/seed";
 import { runRuleEngineScan } from "@/lib/rule-engine";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const [recommendations, settingsRows] = await Promise.all([
@@ -27,6 +30,8 @@ export async function GET() {
 }
 
 export async function POST() {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const scanResult = await runRuleEngineScan();
@@ -47,6 +52,8 @@ export async function POST() {
 }
 
 export async function PATCH(req: NextRequest) {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();

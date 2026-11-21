@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
@@ -6,6 +7,8 @@ import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const posts = await db
@@ -20,6 +23,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();

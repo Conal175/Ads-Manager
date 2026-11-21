@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { productKpiVersions, products } from "@/db/schema";
@@ -10,6 +11,8 @@ export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const { id } = await context.params;
@@ -72,6 +75,8 @@ export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const { id } = await context.params;

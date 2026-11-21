@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
@@ -14,6 +15,8 @@ import { jsonError } from "@/lib/api-utils";
 import { queryMultiLevelReports } from "@/services/reports-service";
 
 export async function GET(req: NextRequest) {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const { searchParams } = new URL(req.url);
@@ -32,6 +35,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();

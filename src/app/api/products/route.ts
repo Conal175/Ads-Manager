@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { adInsights, productKpiVersions, products } from "@/db/schema";
@@ -7,6 +8,8 @@ import { getTodayIso } from "@/lib/format";
 import { computeProductKpis, evaluateBudgetPacing, resolveKpiForDate } from "@/lib/kpi";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const today = getTodayIso();
@@ -50,6 +53,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();
@@ -76,38 +81,43 @@ export async function POST(req: NextRequest) {
 
     const dailyBudgetTarget = Number(body.dailyBudgetTarget) || 3000000;
 
-    const [createdProduct] = await db
-      .insert(products)
-      .values({
-        code,
-        name,
-        category: String(body.category || "Sản phẩm mới"),
-        status: "active",
-        dailyBudgetTarget,
-        weeklyBudgetTarget: Number(body.weeklyBudgetTarget) || dailyBudgetTarget * 7,
-        monthlyBudgetTarget: Number(body.monthlyBudgetTarget) || dailyBudgetTarget * 30,
-      })
-      .returning();
+    // Create the product and its initial KPI version atomically.
+    const { createdProduct, createdVersion } = await db.transaction(async (tx) => {
+      const [createdProduct] = await tx
+        .insert(products)
+        .values({
+          code,
+          name,
+          category: String(body.category || "Sản phẩm mới"),
+          status: "active",
+          dailyBudgetTarget,
+          weeklyBudgetTarget: Number(body.weeklyBudgetTarget) || dailyBudgetTarget * 7,
+          monthlyBudgetTarget: Number(body.monthlyBudgetTarget) || dailyBudgetTarget * 30,
+        })
+        .returning();
 
-    const [createdVersion] = await db
-      .insert(productKpiVersions)
-      .values({
-        productId: createdProduct.id,
-        versionNumber: 1,
-        effectiveFrom,
-        avgSellingPrice: Number(body.avgSellingPrice),
-        cogs: Number(body.cogs),
-        shippingPackingFee: Number(body.shippingPackingFee),
-        expectedReturnRatePct: Number(body.expectedReturnRatePct),
-        otherCost: Number(body.otherCost ?? 0),
-        targetNetMarginPct: Number(body.targetNetMarginPct),
-        targetCloseRatePct: Number(body.targetCloseRatePct),
-        breakevenCpo: computed.breakevenCpo,
-        targetCpo: computed.targetCpo,
-        ceilingMessageCost: computed.ceilingMessageCost,
-        note: String(body.note || "Khởi tạo hồ sơ KPI v1"),
-      })
-      .returning();
+      const [createdVersion] = await tx
+        .insert(productKpiVersions)
+        .values({
+          productId: createdProduct.id,
+          versionNumber: 1,
+          effectiveFrom,
+          avgSellingPrice: Number(body.avgSellingPrice),
+          cogs: Number(body.cogs),
+          shippingPackingFee: Number(body.shippingPackingFee),
+          expectedReturnRatePct: Number(body.expectedReturnRatePct),
+          otherCost: Number(body.otherCost ?? 0),
+          targetNetMarginPct: Number(body.targetNetMarginPct),
+          targetCloseRatePct: Number(body.targetCloseRatePct),
+          breakevenCpo: computed.breakevenCpo,
+          targetCpo: computed.targetCpo,
+          ceilingMessageCost: computed.ceilingMessageCost,
+          note: String(body.note || "Khởi tạo hồ sơ KPI v1"),
+        })
+        .returning();
+
+      return { createdProduct, createdVersion };
+    });
 
     return NextResponse.json({
       product: createdProduct,

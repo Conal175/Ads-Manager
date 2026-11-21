@@ -72,6 +72,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  if (pathname === "/login") return <>{children}</>;
+
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#f8fafc]">
       {/* Mobile Top Bar */}
@@ -169,6 +171,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Safety Footer Badge */}
         <div className="p-3 border-t border-slate-100 space-y-2">
+          <Link href="/login" className="block text-sm text-blue-700 px-3">Đăng nhập / đổi tài khoản</Link>
+          <button className="block text-sm text-slate-600 px-3" onClick={async () => {
+            const res = await fetch("/api/auth/logout", { method: "POST" });
+            if (res.ok) window.location.assign("/login");
+            else window.alert("Không thể đăng xuất. Vui lòng thử lại.");
+          }}>Đăng xuất</button>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200/70">
             <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
             <div className="text-[11px] text-emerald-800 leading-snug">

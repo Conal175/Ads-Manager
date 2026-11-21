@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { adPresets } from "@/db/schema";
@@ -5,6 +6,8 @@ import { asc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const presets = await db
@@ -19,6 +22,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();
@@ -59,6 +64,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const denied = await authorizeApi("operator", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const { searchParams } = new URL(req.url);

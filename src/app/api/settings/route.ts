@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { systemSettings } from "@/db/schema";
@@ -6,6 +7,8 @@ import { ensureSeeded } from "@/lib/seed";
 import { jsonError, resolveEffectiveSecrets, publicSettings } from "@/lib/api-utils";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const [settings] = await db.select().from(systemSettings).limit(1);
@@ -30,6 +33,8 @@ export async function GET() {
 }
 
 export async function PUT(req: NextRequest) {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();

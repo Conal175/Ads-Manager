@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { aiBriefings } from "@/db/schema";
@@ -7,6 +8,8 @@ import { jsonError } from "@/lib/api-utils";
 import { createDailyAiBriefing } from "@/services/briefing-service";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const list = await db
@@ -22,6 +25,8 @@ export async function GET() {
 }
 
 export async function POST() {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const created = await createDailyAiBriefing();

@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { syncLogs, systemSettings, telegramAlerts } from "@/db/schema";
@@ -9,6 +10,8 @@ import { jsonError, publicSettings, isDemoMode, demoOnlyError } from "@/lib/api-
 import { CRON_JOB_METADATA } from "@/types/domain";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const [settingsRows, logs, alerts] = await Promise.all([
@@ -33,6 +36,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = await authorizeApi("admin", true);
+  if (denied) return denied;
   try {
     await ensureSeeded();
     const body = await req.json();

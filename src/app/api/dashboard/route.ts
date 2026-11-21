@@ -1,3 +1,4 @@
+import { authorizeApi } from "@/lib/auth/server";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -17,6 +18,8 @@ import { getDaysAgoIso, getTodayIso } from "@/lib/format";
 import { evaluateBudgetPacing, resolveKpiForDate } from "@/lib/kpi";
 
 export async function GET() {
+  const denied = await authorizeApi("viewer");
+  if (denied) return denied;
   try {
     await ensureSeeded();
 
