@@ -1,0 +1,2 @@
+-- Applied to Adsmanager on 2026-11-21. RLS does not protect TRUNCATE.
+REVOKE TRUNCATE, TRIGGER ON TABLE public.action_recommendations, public.ad_drafts, public.ad_insights, public.ad_presets, public.ai_briefings, public.creatives, public.daily_sales_reconciliation, public.insight_breakdowns, public.meta_assets, public.meta_media_cache, public.meta_posts, public.product_kpi_versions, public.products, public.sync_logs, public.system_settings, public.telegram_alerts FROM PUBLIC, anon, authenticated;

@@ -28,3 +28,12 @@ Build thành công với URL thử nghiệm (build không kiểm tra kết nối
 ## Tính toàn vẹn KPI
 
 Mã mới khóa hàng sản phẩm trong transaction để cấp số phiên bản KPI tuần tự; ngày trước KPI đầu tiên không áp dụng KPI tương lai. Đầu vào KPI và ngân sách khi tạo sản phẩm được kiểm tra phía server. Báo cáo và dashboard từ chối tính lợi nhuận khi có dữ liệu doanh thu nhưng không có KPI hiệu lực, tránh báo lãi sai. Cần kiểm thử ghi đồng thời với database thực trước khi đưa lên production.
+
+## Kiểm thử bảo mật và dữ liệu ngày 2026-11-21
+
+- Kiểm tra metadata Adsmanager: 17 bảng `public` bật RLS và không có policy. `anon`/`authenticated` vẫn có quyền SELECT ở 16 bảng nghiệp vụ, nhưng RLS hiện từ chối truy cập hàng; bảng vai trò đã thu hồi quyền SELECT. Không coi điều này là bảo vệ các truy vấn server dùng tài khoản PostgreSQL đặc quyền.
+- Migration `20261121081346_revoke_public_unsafe_table_privileges` đã áp dụng trên Adsmanager: thu hồi TRUNCATE và TRIGGER của PUBLIC, anon, authenticated trên 16 bảng nghiệp vụ; kiểm tra lại không còn bảng nào có các quyền đó cho hai vai trò. Không chạy lại migration trên Adsmanager.
+- Truy vấn chỉ đọc: 0 sản phẩm, 0 phiên bản KPI, 0 dòng đối soát, 1 dòng cài đặt, 1 bản gán vai trò; kiểm tra sản phẩm thiếu KPI và trùng phiên bản trả 0 nhưng dữ liệu trống nên không chứng minh logic trên dữ liệu thật. Không ghi sản phẩm thử hoặc thay đổi vai trò.
+- `tests/security-http.test.mjs` chạy với server local giả trên 127.0.0.1:3116: 15 API đọc không đăng nhập/cookie giả, 20 mutation với ba tình huống, 9 trang không đăng nhập và các endpoint auth đều từ chối theo mong đợi. Đây là kiểm tra đường từ chối, không thay thế kiểm thử đăng nhập/ba vai trò/thu hồi hay kiểm thử xâm nhập.
+- Next.js được nâng từ 16.4.2 lên 16.4.6; `npm audit --omit=dev` báo 0 lỗ hổng, audit đầy đủ còn 4 moderate trong nhánh công cụ phát triển drizzle-kit/esbuild. Typecheck, build và kiểm thử unit thành công; build dùng database giả.
+- Chưa kiểm tra transaction ghi/sửa đồng thời bằng database thật, khôi phục backup, đăng ký/xác minh email thật, phân quyền bằng ba phiên thật hoặc quản lý user thực. Preview có thể dùng chung database production. Deployment Protection vẫn bật; Production còn chạy bản cũ thiếu auth mới. SMTP chưa cấu hình và site URL Auth còn localhost. Chưa có vai trò DB tối thiểu, mã hóa secret, audit log phân quyền hoặc bootstrap admin gắn user ID bất biến. Các mục này vẫn là rủi ro trước production.
