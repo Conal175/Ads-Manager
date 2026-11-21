@@ -92,11 +92,10 @@ export async function POST(req: NextRequest) {
         body: `Kết nối Telegram Bot hoạt động ổn định. Hạn mức API Meta hiện tại: ${settings.metaRateLimitPct}%. Nhấn liên kết bên dưới để mở trang giám sát hệ thống.`,
         deepLinkPath: "/system",
       });
-      return NextResponse.json({
-        ok: true,
-        result,
-        message: "Đã gửi tin nhắn kiểm tra qua Telegram Bot.",
-      });
+      if (!result.skipped && result.alert.deliveryStatus !== "sent") {
+        return NextResponse.json({ error: "Không gửi được tin nhắn Telegram. Hãy kiểm tra cấu hình và kết nối.", result }, { status: 502 });
+      }
+      return NextResponse.json({ ok: true, result, message: "Đã gửi tin nhắn kiểm tra qua Telegram Bot." });
     }
 
     if (body.action === "run_job") {

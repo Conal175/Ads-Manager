@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { adInsights, productKpiVersions, products } from "@/db/schema";
 import { asc, desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
+import { parseKpiInput, isValidDate } from "@/lib/kpi-validation";
 import { getTodayIso } from "@/lib/format";
 import { computeProductKpis, evaluateBudgetPacing, resolveKpiForDate } from "@/lib/kpi";
 
@@ -69,17 +70,14 @@ export async function POST(req: NextRequest) {
     }
 
     const effectiveFrom = String(body.effectiveFrom || getTodayIso());
-    const computed = computeProductKpis({
-      avgSellingPrice: Number(body.avgSellingPrice),
-      cogs: Number(body.cogs),
-      shippingPackingFee: Number(body.shippingPackingFee),
-      expectedReturnRatePct: Number(body.expectedReturnRatePct),
-      otherCost: Number(body.otherCost ?? 0),
-      targetNetMarginPct: Number(body.targetNetMarginPct),
-      targetCloseRatePct: Number(body.targetCloseRatePct),
-    });
-
-    const dailyBudgetTarget = Number(body.dailyBudgetTarget) || 3000000;
+    const input = parseKpiInput(body);
+    if (!input || !isValidDate(effectiveFrom)) return NextResponse.json({ error: "Thông số KPI hoặc ngày hiệu lực không hợp lệ." }, { status: 400 });
+    const computed = computeProductKpis(input);
+    const budget = (value: unknown, fallback: number) => value == null ? fallback : Number(value);
+    const dailyBudgetTarget = budget(body.dailyBudgetTarget, 3000000);
+    const weeklyBudgetTarget = budget(body.weeklyBudgetTarget, dailyBudgetTarget * 7);
+    const monthlyBudgetTarget = budget(body.monthlyBudgetTarget, dailyBudgetTarget * 30);
+    if ([dailyBudgetTarget, weeklyBudgetTarget, monthlyBudgetTarget].some(n => !Number.isSafeInteger(n) || n < 0 || n > 1_000_000_000_000)) return NextResponse.json({ error: "Ngân sách không hợp lệ." }, { status: 400 });
 
     // Create the product and its initial KPI version atomically.
     const { createdProduct, createdVersion } = await db.transaction(async (tx) => {
@@ -91,8 +89,8 @@ export async function POST(req: NextRequest) {
           category: String(body.category || "Sản phẩm mới"),
           status: "active",
           dailyBudgetTarget,
-          weeklyBudgetTarget: Number(body.weeklyBudgetTarget) || dailyBudgetTarget * 7,
-          monthlyBudgetTarget: Number(body.monthlyBudgetTarget) || dailyBudgetTarget * 30,
+          weeklyBudgetTarget,
+          monthlyBudgetTarget,
         })
         .returning();
 
@@ -102,13 +100,7 @@ export async function POST(req: NextRequest) {
           productId: createdProduct.id,
           versionNumber: 1,
           effectiveFrom,
-          avgSellingPrice: Number(body.avgSellingPrice),
-          cogs: Number(body.cogs),
-          shippingPackingFee: Number(body.shippingPackingFee),
-          expectedReturnRatePct: Number(body.expectedReturnRatePct),
-          otherCost: Number(body.otherCost ?? 0),
-          targetNetMarginPct: Number(body.targetNetMarginPct),
-          targetCloseRatePct: Number(body.targetCloseRatePct),
+          ...input,
           breakevenCpo: computed.breakevenCpo,
           targetCpo: computed.targetCpo,
           ceilingMessageCost: computed.ceilingMessageCost,

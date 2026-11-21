@@ -92,7 +92,7 @@ export function resolveKpiForDate<T extends KpiVersionLike>(
   });
 
   const matched = sorted.find((v) => v.effectiveFrom <= reportDate);
-  return matched ?? sorted[sorted.length - 1];
+  return matched ?? null;
 }
 
 export interface PacingResult {

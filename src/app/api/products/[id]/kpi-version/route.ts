@@ -5,6 +5,7 @@ import { productKpiVersions, products } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 import { computeProductKpis } from "@/lib/kpi";
+import { parseKpiInput, isValidDate } from "@/lib/kpi-validation";
 import { getTodayIso } from "@/lib/format";
 
 export async function POST(
@@ -17,47 +18,31 @@ export async function POST(
     await ensureSeeded();
     const { id } = await context.params;
     const productId = Number(id);
-    if (!Number.isFinite(productId)) {
+    if (!Number.isSafeInteger(productId) || productId <= 0) {
       return NextResponse.json({ error: "ID sản phẩm không hợp lệ." }, { status: 400 });
     }
 
     const body = await req.json();
-    const existingVersions = await db
-      .select()
-      .from(productKpiVersions)
-      .where(eq(productKpiVersions.productId, productId))
-      .orderBy(desc(productKpiVersions.versionNumber));
-
-    const nextVersionNumber = (existingVersions[0]?.versionNumber ?? 0) + 1;
     const effectiveFrom = String(body.effectiveFrom || getTodayIso());
-
-    const input = {
-      avgSellingPrice: Number(body.avgSellingPrice),
-      cogs: Number(body.cogs),
-      shippingPackingFee: Number(body.shippingPackingFee),
-      expectedReturnRatePct: Number(body.expectedReturnRatePct),
-      otherCost: Number(body.otherCost ?? 0),
-      targetNetMarginPct: Number(body.targetNetMarginPct),
-      targetCloseRatePct: Number(body.targetCloseRatePct),
-    };
+    const input = parseKpiInput(body);
+    if (!input || !isValidDate(effectiveFrom)) return NextResponse.json({ error: "Thông số KPI hoặc ngày hiệu lực không hợp lệ." }, { status: 400 });
     const computed = computeProductKpis(input);
-
-    const [created] = await db
-      .insert(productKpiVersions)
-      .values({
-        productId,
-        versionNumber: nextVersionNumber,
-        effectiveFrom,
-        ...input,
-        breakevenCpo: computed.breakevenCpo,
-        targetCpo: computed.targetCpo,
+    // Serialize version allocation per product without locking unrelated products.
+    const result = await db.transaction(async (tx) => {
+      const found = await tx.select({ id: products.id }).from(products).where(eq(products.id, productId)).for("update");
+      if (!found.length) return null;
+      const existingVersions = await tx.select({ versionNumber: productKpiVersions.versionNumber }).from(productKpiVersions).where(eq(productKpiVersions.productId, productId)).orderBy(desc(productKpiVersions.versionNumber)).limit(1);
+      const nextVersionNumber = (existingVersions[0]?.versionNumber ?? 0) + 1;
+      const [created] = await tx.insert(productKpiVersions).values({
+        productId, versionNumber: nextVersionNumber, effectiveFrom, ...input,
+        breakevenCpo: computed.breakevenCpo, targetCpo: computed.targetCpo,
         ceilingMessageCost: computed.ceilingMessageCost,
-        note: String(
-          body.note || `Cập nhật cấu trúc KPI phiên bản v${nextVersionNumber}`
-        ),
-      })
-      .returning();
-
+        note: String(body.note || `Cập nhật cấu trúc KPI phiên bản v${nextVersionNumber}`),
+      }).returning();
+      return { created, nextVersionNumber };
+    });
+    if (!result) return NextResponse.json({ error: "Không tìm thấy sản phẩm." }, { status: 404 });
+    const { created, nextVersionNumber } = result;
     return NextResponse.json({
       kpiVersion: created,
       message: `Đã lưu phiên bản KPI v${nextVersionNumber} có hiệu lực từ ${effectiveFrom} (không ghi đè lịch sử cũ).`,

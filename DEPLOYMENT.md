@@ -4,8 +4,8 @@
 
 - Supabase `Adsmanager` đã được khởi tạo 16 bảng trong schema `public` và bật RLS, không có dữ liệu mẫu. Vercel `ads_manager` đã liên kết repository này; `DATABASE_URL` đã được cấu hình cho production, preview và development. Deployment cũ thất bại trước khi biến được cấu hình.
 - `drizzle/0000_polite_slayback.sql` là migration khởi tạo 16 bảng từ schema hiện tại, kèm RLS mặc định từ chối các vai trò Data API. Migration tương đương đã được áp dụng trên Supabase với tên `initial_adspulse_schema`, phiên bản `20261121041905`. Không chạy lại migration khởi tạo trên database đó. Đọc kỹ và sao lưu trước khi áp dụng vào bất kỳ database nào khác đã có dữ liệu.
-- Server kết nối trực tiếp PostgreSQL bằng `DATABASE_URL`, không dùng Supabase Auth hoặc API client. Hãy đặt chuỗi kết nối Supabase pooler có SSL trong Vercel Environment Variables, không đưa mật khẩu vào Git hoặc chat. `drizzle.config.json` hiện trỏ vào PostgreSQL local; không chạy `drizzle-kit push` với cấu hình mặc định để triển khai Supabase.
-- Vercel hiện bật Deployment Protection. Không tắt cơ chế này trước khi có xác thực và phân quyền phù hợp trong ứng dụng. Các API hiện chưa tự xác thực; một số trả lại cấu hình bao gồm thông tin nhạy cảm. RLS chỉ bảo vệ truy cập Data API, không bảo vệ các API Next.js dùng kết nối PostgreSQL đặc quyền.
+- Server kết nối trực tiếp PostgreSQL bằng `DATABASE_URL`; bản Preview dùng Supabase Auth cho phiên đăng nhập và phân quyền ứng dụng. Hãy đặt chuỗi kết nối Supabase pooler có SSL trong Vercel Environment Variables, không đưa mật khẩu vào Git hoặc chat. `drizzle.config.json` hiện trỏ vào PostgreSQL local; không chạy `drizzle-kit push` với cấu hình mặc định để triển khai Supabase.
+- Vercel hiện bật Deployment Protection. Không tắt cơ chế này trước khi có xác thực và phân quyền phù hợp trong ứng dụng. Bản Production hiện vẫn là phiên bản cũ chưa có lớp xác thực mới; bản Preview đã có kiểm tra vai trò phía server, nhưng cần kiểm thử end-to-end trước khi triển khai production. RLS chỉ bảo vệ truy cập Data API, không bảo vệ các API Next.js dùng kết nối PostgreSQL đặc quyền.
 
 ## Giới hạn quan trọng trước khi vận hành thật
 
@@ -23,4 +23,8 @@ DATABASE_URL='postgresql://postgres:postgres@127.0.0.1:5432/app_db' npm run buil
 npm run lint
 ```
 
-Build thành công với URL thử nghiệm (build không kiểm tra kết nối database). Lint hiện còn 4 lỗi có sẵn trong các trang launcher, dashboard và reports. Phông chữ được đóng gói cục bộ để build không phụ thuộc Google Fonts.
+Build thành công với URL thử nghiệm (build không kiểm tra kết nối database). Lint hiện vẫn có lỗi cần xử lý ở launcher, dashboard, reports và users. Phông chữ được đóng gói cục bộ để build không phụ thuộc Google Fonts.
+
+## Tính toàn vẹn KPI
+
+Mã mới khóa hàng sản phẩm trong transaction để cấp số phiên bản KPI tuần tự; ngày trước KPI đầu tiên không áp dụng KPI tương lai. Đầu vào KPI và ngân sách khi tạo sản phẩm được kiểm tra phía server. Báo cáo và dashboard từ chối tính lợi nhuận khi có dữ liệu doanh thu nhưng không có KPI hiệu lực, tránh báo lãi sai. Cần kiểm thử ghi đồng thời với database thực trước khi đưa lên production.

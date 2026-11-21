@@ -87,7 +87,7 @@ export async function GET() {
       if (!prod) continue;
       const versions = allKpiVersions.filter((v) => v.productId === prod.id);
       const kpi = resolveKpiForDate(versions, s.reportDate);
-      if (!kpi) continue;
+      if (!kpi) throw new Error("Không có KPI hiệu lực cho dữ liệu doanh thu; không thể tính lợi nhuận an toàn.");
       const deliveredOrders = Math.max(0, s.ordersClosed - s.returnedOrders);
       const grossMarginBeforeAds = deliveredOrders * kpi.breakevenCpo;
       totalNetProfit7d += grossMarginBeforeAds;

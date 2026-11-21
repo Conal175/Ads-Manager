@@ -313,6 +313,7 @@ export async function queryMultiLevelReports(params: {
 
       const versions = allKpiVersions.filter((v) => v.productId === prod.id);
       const kpiAtDate = resolveKpiForDate(versions, s.reportDate);
+      if (!kpiAtDate) throw new Error("Không có KPI hiệu lực cho dữ liệu doanh thu; không thể tính lợi nhuận an toàn.");
       const ads = spendMsgByDateProd.get(`${s.reportDate}::${prod.code}`) ?? {
         spend: 0,
         messages: 0,

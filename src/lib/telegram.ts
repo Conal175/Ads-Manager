@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { systemSettings, telegramAlerts } from "@/db/schema";
 import { and, desc, eq, gte } from "drizzle-orm";
-import { resolveEffectiveSecrets } from "./api-utils";
+import { resolveEffectiveSecrets, isDemoMode } from "./api-utils";
 
 export interface SendTelegramAlertInput {
   streamType: "realtime" | "scheduled";
@@ -32,6 +32,7 @@ export async function dispatchTelegramAlert(input: SendTelegramAlertInput) {
       .where(
         and(
           eq(telegramAlerts.dedupKey, input.dedupKey),
+          eq(telegramAlerts.deliveryStatus, "sent"),
           gte(telegramAlerts.createdAt, cutoff)
         )
       )
@@ -52,7 +53,7 @@ export async function dispatchTelegramAlert(input: SendTelegramAlertInput) {
   const botToken = secrets.telegramBotToken;
   const chatId = secrets.telegramChatId;
 
-  let deliveryStatus: "sent" | "simulated" | "failed" = "simulated";
+  let deliveryStatus: "sent" | "simulated" | "failed" = isDemoMode() ? "simulated" : "failed";
 
   if (botToken && chatId && !botToken.startsWith("demo_")) {
     try {
