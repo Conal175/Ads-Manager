@@ -9,7 +9,7 @@ import { dispatchTelegramAlert } from "@/lib/telegram";
 import { getMetaAccountStatusInfo } from "@/lib/format";
 
 export async function GET() {
-  const denied = await authorizeApi("viewer");
+  const denied = await authorizeApi("operator");
   if (denied) return denied;
   try {
     await ensureSeeded();

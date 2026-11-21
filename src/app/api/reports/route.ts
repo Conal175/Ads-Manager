@@ -15,7 +15,7 @@ import { jsonError } from "@/lib/api-utils";
 import { queryMultiLevelReports } from "@/services/reports-service";
 
 export async function GET(req: NextRequest) {
-  const denied = await authorizeApi("viewer");
+  const denied = await authorizeApi("admin");
   if (denied) return denied;
   try {
     await ensureSeeded();

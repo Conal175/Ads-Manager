@@ -7,7 +7,7 @@ import { ensureSeeded } from "@/lib/seed";
 import { runRuleEngineScan } from "@/lib/rule-engine";
 
 export async function GET() {
-  const denied = await authorizeApi("viewer");
+  const denied = await authorizeApi("operator");
   if (denied) return denied;
   try {
     await ensureSeeded();

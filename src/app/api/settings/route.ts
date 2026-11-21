@@ -7,7 +7,7 @@ import { ensureSeeded } from "@/lib/seed";
 import { jsonError, resolveEffectiveSecrets, publicSettings } from "@/lib/api-utils";
 
 export async function GET() {
-  const denied = await authorizeApi("viewer");
+  const denied = await authorizeApi("operator");
   if (denied) return denied;
   try {
     await ensureSeeded();

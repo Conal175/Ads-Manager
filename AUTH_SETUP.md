@@ -12,7 +12,7 @@ Cần giữ Vercel Deployment Protection. Mã trong workspace chưa được tri
 ## Quyền hiện tại trong mã
 
 - Mọi API dữ liệu đều yêu cầu phiên Supabase Auth được xác minh và email đã xác nhận. Người chưa được gán quyền bị từ chối. `/api/health` chỉ kiểm tra kết nối DB và không yêu cầu đăng nhập.
-- Viewer đọc dữ liệu; operator thêm/sửa dữ liệu nghiệp vụ; admin sửa cài đặt, chạy job và quản lý vai trò. Các thao tác ở `/api/actions` đều yêu cầu admin để bảo vệ cấu hình quy tắc; các lệnh đồng bộ/chạy job ở assets, reports, briefings và system yêu cầu admin.
+- Viewer và tài khoản chưa được phân quyền không được xem trang hoặc API nghiệp vụ. Operator chỉ được vào tài sản, sản phẩm, creative, launcher và đề xuất; API dữ liệu tương ứng yêu cầu tối thiểu operator. Admin xem toàn bộ và được sửa cài đặt, chạy job và quản lý vai trò. Các thao tác ở `/api/actions` đều yêu cầu admin để bảo vệ cấu hình quy tắc; các lệnh đồng bộ/chạy job ở assets, reports, briefings và system yêu cầu admin.
 - Admin có thể gọi `GET /api/admin/roles`, `PUT /api/admin/roles` (JSON `userId`, `role`) và `DELETE /api/admin/roles?userId=...`. `userId` là UUID người dùng đã tồn tại trong Supabase Auth; không tự đăng ký quyền từ client. Trang `/users` cung cấp giao diện cấp và thu hồi quyền; API danh sách chỉ dành cho admin và đọc tối thiểu các cột cần thiết từ `auth.users`. Chưa có audit log và chưa có kiểm thử end-to-end với ba vai trò.
 - Các yêu cầu thay đổi dữ liệu yêu cầu Origin cùng host và HTTPS trong production. Thử nghiệm cục bộ bằng `next dev` cho phép HTTP.
 

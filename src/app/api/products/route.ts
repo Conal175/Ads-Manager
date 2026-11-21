@@ -8,7 +8,7 @@ import { getTodayIso } from "@/lib/format";
 import { computeProductKpis, evaluateBudgetPacing, resolveKpiForDate } from "@/lib/kpi";
 
 export async function GET() {
-  const denied = await authorizeApi("viewer");
+  const denied = await authorizeApi("operator");
   if (denied) return denied;
   try {
     await ensureSeeded();

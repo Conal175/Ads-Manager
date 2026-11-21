@@ -14,10 +14,10 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Không thể đăng nhập."); return; }
       setPassword("");
-      // Authentication and application access are separate: new users need a role.
-      const access = await fetch("/api/products", { cache: "no-store" });
-      if (access.status === 403) { setError("Tài khoản đã đăng nhập nhưng chưa được cấp quyền. Vui lòng liên hệ quản trị viên."); return; }
-      window.location.assign("/");
+      const access = await fetch("/api/auth/me", { cache: "no-store" });
+      if (!access.ok) { setError("Không thể kiểm tra quyền tài khoản. Vui lòng thử lại."); return; }
+      const identity = await access.json();
+      window.location.assign(identity.role === "admin" ? "/" : identity.role === "operator" ? "/assets" : "/no-access");
     } catch { setError("Không thể kết nối. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { canViewPage, type AppRole } from "@/lib/auth/policy";
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -78,8 +79,14 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [role, setRole] = useState<AppRole | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" }).then(res => res.ok ? res.json() : null).then(data => { if (active) setRole(data?.role ?? null); }).catch(() => { if (active) setRole(null); });
+    return () => { active = false; };
+  }, [pathname]);
 
-  if (pathname === "/login" || pathname === "/register" || pathname.startsWith("/auth/")) return <>{children}</>;
+  if (pathname === "/login" || pathname === "/register" || pathname === "/no-access" || pathname.startsWith("/auth/")) return <>{children}</>;
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-[#f8fafc]">
@@ -134,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => canViewPage(role, item.href)).map((item) => {
             const Icon = item.icon;
             const active =
               item.href === "/"

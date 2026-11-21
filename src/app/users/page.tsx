@@ -61,7 +61,7 @@ export default function UsersPage() {
   }
   return <main className="max-w-6xl mx-auto p-5 md:p-8 space-y-5">
     <div><h1 className="text-2xl font-bold text-slate-900">Quản lý người dùng</h1><p className="text-sm text-slate-600 mt-1">Chỉ quản trị viên có thể xem và cập nhật quyền. Tài khoản mới không tự có quyền truy cập.</p></div>
-    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">Chỉ xem: xem dữ liệu · Vận hành: thao tác nghiệp vụ · Quản trị: cấu hình, tác vụ và phân quyền.</div>
+    <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-900">Chỉ xem: chưa được vào trang nghiệp vụ · Vận hành: năm trang được phân công · Quản trị: toàn bộ trang, cấu hình, tác vụ và phân quyền.</div>
     {error && <div role="alert" className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-4 text-sm">{error} <Link href="/login" className="underline">Đăng nhập</Link></div>}
     {message && <div role="status" className="bg-emerald-50 text-emerald-700 rounded-lg p-4 text-sm">{message}</div>}
     <section className="bg-white border border-slate-200 rounded-xl overflow-hidden">
