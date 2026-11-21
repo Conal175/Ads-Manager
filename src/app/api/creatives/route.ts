@@ -110,8 +110,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Manual add Creative metadata from Drive File ID
-    const fileSizeMb = Number(body.fileSizeMb) || 32;
+    // Manual metadata must identify a real product and file; never stringify missing values.
+    if ([body.creativeCode, body.driveFileId, body.fileName].some(value => typeof value !== "string" || !value.trim()) || !Number.isSafeInteger(Number(body.productId)) || Number(body.productId) <= 0) {
+      return NextResponse.json({ error: "Mã Creative, sản phẩm, ID file và tên file là bắt buộc." }, { status: 400 });
+    }
+    const fileSizeMb = body.fileSizeMb == null ? 32 : Number(body.fileSizeMb);
+    const durationSec = body.durationSec == null ? 30 : Number(body.durationSec);
+    if (!Number.isFinite(fileSizeMb) || fileSizeMb < 0 || !Number.isSafeInteger(durationSec) || durationSec < 0) return NextResponse.json({ error: "Kích thước hoặc thời lượng không hợp lệ." }, { status: 400 });
     const [inserted] = await db
       .insert(creatives)
       .values({
@@ -124,7 +129,7 @@ export async function POST(req: NextRequest) {
         fileName: String(body.fileName).trim(),
         mediaType: body.mediaType === "image" ? "image" : "video",
         fileSizeMb,
-        durationSec: Number(body.durationSec) || 30,
+        durationSec,
         thumbnailUrl: String(body.thumbnailUrl || ""),
         hookAngle: String(body.hookAngle || ""),
         lifecycleStatus: String(body.lifecycleStatus || "cho_test"),

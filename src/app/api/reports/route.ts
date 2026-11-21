@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 import { getDaysAgoIso, getTodayIso } from "@/lib/format";
 import { jsonError } from "@/lib/api-utils";
+import { isValidDate } from "@/lib/kpi-validation";
 import { queryMultiLevelReports } from "@/services/reports-service";
 
 export async function GET(req: NextRequest) {
@@ -108,9 +109,12 @@ export async function POST(req: NextRequest) {
     if (body.action === "upsert_sales") {
       const reportDate = String(body.reportDate || getTodayIso());
       const productId = Number(body.productId);
-      const ordersClosed = Math.max(0, Number(body.ordersClosed) || 0);
-      const actualRevenue = Math.max(0, Number(body.actualRevenue) || 0);
-      const returnedOrders = Math.max(0, Number(body.returnedOrders) || 0);
+      const ordersClosed = Number(body.ordersClosed ?? 0);
+      const actualRevenue = Number(body.actualRevenue ?? 0);
+      const returnedOrders = Number(body.returnedOrders ?? 0);
+      if (!isValidDate(reportDate) || !Number.isSafeInteger(productId) || productId <= 0 || !Number.isSafeInteger(ordersClosed) || ordersClosed < 0 || ordersClosed > 2147483647 || !Number.isSafeInteger(returnedOrders) || returnedOrders < 0 || returnedOrders > ordersClosed || !Number.isSafeInteger(actualRevenue) || actualRevenue < 0 || actualRevenue > 1_000_000_000_000) {
+        return jsonError("Ngày, sản phẩm, doanh thu hoặc số đơn không hợp lệ; số đơn hoàn không được vượt số đơn chốt.", 400);
+      }
       const actualReturnRatePct =
         ordersClosed > 0
           ? Number(((returnedOrders / ordersClosed) * 100).toFixed(1))

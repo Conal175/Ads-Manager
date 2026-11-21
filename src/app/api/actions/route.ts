@@ -85,8 +85,8 @@ export async function PATCH(req: NextRequest) {
       note?: string;
     };
 
-    if (!id || !decision) {
-      return NextResponse.json({ error: "Thiếu ID hoặc trạng thái xử lý." }, { status: 400 });
+    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0 || !["resolved", "dismissed", "open"].includes(decision)) {
+      return NextResponse.json({ error: "ID hoặc trạng thái xử lý không hợp lệ." }, { status: 400 });
     }
 
     const now = new Date();
@@ -106,6 +106,7 @@ export async function PATCH(req: NextRequest) {
       .where(eq(actionRecommendations.id, Number(id)))
       .returning();
 
+    if (!updated) return NextResponse.json({ error: "Không tìm thấy đề xuất." }, { status: 404 });
     return NextResponse.json({
       ok: true,
       recommendation: updated,

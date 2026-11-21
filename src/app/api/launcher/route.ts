@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
     await ensureSeeded();
     const body = (await req.json()) as Record<string, unknown>;
     const action = body.action as "preflight" | "save_draft" | "launch";
+    if (!["preflight", "save_draft", "launch"].includes(action)) return jsonError("Hành động không hợp lệ.", 400);
     const flowType = (body.flowType as LauncherFlowType) || "flow1_drive";
 
     const [settings] = await db.select().from(systemSettings).limit(1);
