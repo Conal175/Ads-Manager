@@ -73,3 +73,14 @@ export function resolveEffectiveSecrets(dbSettings?: {
     },
   };
 }
+
+/** Do not expose saved credentials to the browser. Empty fields mean unchanged on save. */
+export function publicSettings<T extends { metaSystemUserToken: string | null; googleServiceAccountJson: string | null; telegramBotToken: string | null; aiApiKey: string | null }>(settings: T): T {
+  return { ...settings, metaSystemUserToken: "", googleServiceAccountJson: "", telegramBotToken: "", aiApiKey: "" };
+}
+
+export function demoOnlyError() {
+  return jsonError("Chức năng này hiện chỉ mô phỏng, chưa kết nối dữ liệu thực và tạm ngừng để bảo vệ dữ liệu.", 501);
+}
+
+export const isDemoMode = () => process.env.APP_DEMO_MODE === "true";

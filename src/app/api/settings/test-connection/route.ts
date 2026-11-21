@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         service === "drive"
           ? secrets.googleDriveRootFolderId
           : secrets.googleSheetsUrl;
-      result = verifyGoogleWorkspaceConfig(
+      result = await verifyGoogleWorkspaceConfig(
         service,
         secrets.googleServiceAccountJson,
         targetRef

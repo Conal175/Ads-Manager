@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { systemSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
-import { jsonError, resolveEffectiveSecrets } from "@/lib/api-utils";
+import { jsonError, resolveEffectiveSecrets, publicSettings } from "@/lib/api-utils";
 
 export async function GET() {
   try {
@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({
       settings: settings
         ? {
-            ...settings,
+            ...publicSettings(settings),
             aiProvider:
               settings.aiProvider === "openai"
                 ? "gemini-2.5-flash"
@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest) {
       updatedAt: new Date(),
     };
 
-    if (typeof body.metaSystemUserToken === "string")
+    if (typeof body.metaSystemUserToken === "string" && body.metaSystemUserToken.trim() !== "")
       updateData.metaSystemUserToken = body.metaSystemUserToken.trim();
     if (typeof body.metaBusinessManagerId === "string")
       updateData.metaBusinessManagerId = body.metaBusinessManagerId.trim();
@@ -50,13 +50,13 @@ export async function PUT(req: NextRequest) {
       updateData.googleDriveRootFolderId = body.googleDriveRootFolderId.trim();
     if (typeof body.googleSheetsUrl === "string")
       updateData.googleSheetsUrl = body.googleSheetsUrl.trim();
-    if (typeof body.googleServiceAccountJson === "string")
+    if (typeof body.googleServiceAccountJson === "string" && body.googleServiceAccountJson.trim() !== "")
       updateData.googleServiceAccountJson = body.googleServiceAccountJson;
-    if (typeof body.telegramBotToken === "string")
+    if (typeof body.telegramBotToken === "string" && body.telegramBotToken.trim() !== "")
       updateData.telegramBotToken = body.telegramBotToken.trim();
     if (typeof body.telegramChatId === "string")
       updateData.telegramChatId = body.telegramChatId.trim();
-    if (typeof body.aiApiKey === "string")
+    if (typeof body.aiApiKey === "string" && body.aiApiKey.trim() !== "")
       updateData.aiApiKey = body.aiApiKey.trim();
     if (typeof body.aiProvider === "string")
       updateData.aiProvider = body.aiProvider;
@@ -80,7 +80,7 @@ export async function PUT(req: NextRequest) {
 
     const secrets = resolveEffectiveSecrets(updated);
     return NextResponse.json({
-      settings: { ...updated, envKeyDetected: secrets.envKeyDetected },
+      settings: { ...publicSettings(updated), envKeyDetected: secrets.envKeyDetected },
     });
   } catch (err) {
     console.error("PUT /api/settings error:", err);

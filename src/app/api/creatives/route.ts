@@ -1,3 +1,4 @@
+import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "sync_drive") {
+    if (!isDemoMode()) return demoOnlyError();
       const started = Date.now();
       const [settings] = await db.select().from(systemSettings).limit(1);
       const allProducts = await db.select().from(products);

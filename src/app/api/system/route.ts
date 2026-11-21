@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 import { dispatchTelegramAlert } from "@/lib/telegram";
 import { runRuleEngineScan } from "@/lib/rule-engine";
-import { jsonError } from "@/lib/api-utils";
+import { jsonError, publicSettings, isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { CRON_JOB_METADATA } from "@/types/domain";
 
 export async function GET() {
@@ -22,7 +22,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
-      settings: settingsRows[0] ?? null,
+      settings: settingsRows[0] ? publicSettings(settingsRows[0]) : null,
       logs,
       alerts,
     });
@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "simulate_rate_limit") {
+      if (!isDemoMode()) return demoOnlyError();
       const targetPct = Math.min(
         100,
         Math.max(5, Number(body.rateLimitPct) || 82)
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
       });
 
       return NextResponse.json({
-        settings: updated,
+        settings: publicSettings(updated),
         message: throttleMode
           ? `Tải API chạm ${targetPct}% (>75%) — Hệ thống đã tự động giãn chu kỳ đồng bộ!`
           : `Tải API ở mức an toàn (${targetPct}%) — Chu kỳ đồng bộ hoạt động bình thường.`,
@@ -103,6 +104,7 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      if (!isDemoMode()) return demoOnlyError();
       const isThrottled = settings.throttleMode && jobName.startsWith("meta_");
       await db.insert(syncLogs).values({
         jobName,

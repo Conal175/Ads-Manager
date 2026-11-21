@@ -1,3 +1,4 @@
+import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { creatives, metaAssets, metaPosts } from "@/db/schema";
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     if (body.action === "pull_from_fanpage") {
+    if (!isDemoMode()) return demoOnlyError();
       const pageMetaId = String(body.pageMetaId || "").trim();
       const creativeId = body.creativeId ? Number(body.creativeId) : null;
       const [page] = await db

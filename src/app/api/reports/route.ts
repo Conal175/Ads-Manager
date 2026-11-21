@@ -1,3 +1,4 @@
+import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
     const [settings] = await db.select().from(systemSettings).limit(1);
 
     if (body.action === "refresh_insights") {
+    if (!isDemoMode()) return demoOnlyError();
       const started = Date.now();
       const today = getTodayIso();
       const todayRows = await db
@@ -81,6 +83,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (body.action === "sync_sheets") {
+    if (!isDemoMode()) return demoOnlyError();
       const started = Date.now();
       await db.insert(syncLogs).values({
         jobName: "google_sheets",

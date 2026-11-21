@@ -17,7 +17,7 @@ import {
   systemSettings,
   telegramAlerts,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDaysAgoIso, getTodayIso } from "./format";
 import { computeProductKpis } from "./kpi";
 
@@ -34,6 +34,27 @@ export async function ensureSeeded(): Promise<void> {
 }
 
 async function runSeedIfEmpty(): Promise<void> {
+  // Production starts with configuration only, never fictitious advertising data.
+  if (process.env.APP_DEMO_MODE !== "true") {
+    await db.transaction(async (tx) => {
+      // Multiple serverless instances may start at the same time.
+      await tx.execute(sql`select pg_advisory_xact_lock(1735448821)`);
+      const rows = await tx.select({ id: systemSettings.id }).from(systemSettings).limit(1);
+      if (!rows.length) {
+        await tx.insert(systemSettings).values({
+          ruleConfigJson: {
+            killMsgCeilingPct: 130, killMinSpend: 120000,
+            scaleTargetDiscountPct: 20, scaleMinMessages: 12, scaleMinDays: 2,
+            fatigueFrequencyThreshold: 2.5, fatigueCtrDropDays: 3,
+            leakageSpendSharePct: 15, leakageCostMultiplier: 1.5,
+          },
+          metaRateLimitPct: 0, metaCpuUsagePct: 0, metaTimeUsagePct: 0,
+          connectionStatuses: {},
+        });
+      }
+    });
+    return;
+  }
   const existingSettings = await db.select().from(systemSettings).limit(1);
   if (existingSettings.length > 0) {
     const first = existingSettings[0];

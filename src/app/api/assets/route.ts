@@ -1,3 +1,4 @@
+import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { metaAssets, syncLogs, systemSettings } from "@/db/schema";
@@ -46,6 +47,7 @@ export async function PATCH(req: NextRequest) {
     if (typeof isMonitored === "boolean") {
       updatePayload.isMonitored = isMonitored;
     }
+    if (typeof accountStatus === "number" && !isDemoMode()) return demoOnlyError();
     if (typeof accountStatus === "number") {
       updatePayload.accountStatus = accountStatus;
       updatePayload.disableReason =
@@ -89,6 +91,7 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST() {
+    if (!isDemoMode()) return demoOnlyError();
   try {
     await ensureSeeded();
     const started = Date.now();

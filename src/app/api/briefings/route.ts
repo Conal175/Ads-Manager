@@ -27,7 +27,7 @@ export async function POST() {
     const created = await createDailyAiBriefing();
     return NextResponse.json({
       briefing: created,
-      message: `Đã tạo mới Bản tin AI Briefing (${created.providerUsed}) và gửi bản sao qua Telegram.`,
+      message: `Đã tạo Bản tin AI Briefing (${created.providerUsed}). Telegram: ${created.sentToTelegram ? "đã gửi" : "chưa gửi"}.`,
     });
   } catch (err) {
     console.error("POST /api/briefings error:", err);

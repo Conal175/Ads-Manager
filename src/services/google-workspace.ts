@@ -1,3 +1,4 @@
+import { GoogleAuth } from "google-auth-library";
 import type { ConnectionStatusResult } from "@/types/domain";
 
 /**
@@ -19,59 +20,33 @@ export const DRIVE_FOLDER_CONVENTION = "Kho_Ads/[Mã_SP]/[YYYY-MM]";
 /**
  * Xác thực Google Service Account JSON cho Google Drive hoặc Google Sheets
  */
-export function verifyGoogleWorkspaceConfig(
+export async function verifyGoogleWorkspaceConfig(
   service: "drive" | "sheets",
   serviceAccountJsonRaw: string,
   targetRef: string
-): ConnectionStatusResult {
+): Promise<ConnectionStatusResult> {
   const checkedAt = new Date().toISOString();
-  const saRaw = serviceAccountJsonRaw.trim();
-  const cleanTarget = targetRef.trim();
-
-  if (!saRaw || !cleanTarget) {
-    return {
-      ok: false,
-      mode: "sandbox",
-      checkedAt,
-      message:
-        service === "drive"
-          ? "Thiếu Service Account JSON hoặc ID thư mục gốc Google Drive."
-          : "Thiếu Service Account JSON hoặc đường dẫn Google Sheets đối soát.",
-    };
-  }
-
   try {
-    const parsed = JSON.parse(saRaw) as {
-      client_email?: string;
-      project_id?: string;
-      private_key?: string;
-    };
-    if (!parsed.client_email) {
-      throw new Error("Thiếu trường client_email trong JSON.");
+    const credentials = JSON.parse(serviceAccountJsonRaw) as { client_email?: string; private_key?: string };
+    if (!credentials.client_email || !credentials.private_key) throw new Error("Thiếu email hoặc private key của Service Account.");
+    const auth = new GoogleAuth({ credentials, scopes: [service === "drive" ? "https://www.googleapis.com/auth/drive.readonly" : "https://www.googleapis.com/auth/spreadsheets.readonly"] });
+    const client = await auth.getClient();
+    let url: string;
+    if (service === "drive") {
+      const id = targetRef.trim();
+      if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw new Error("ID thư mục Drive không hợp lệ.");
+      url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?fields=id,name,mimeType`;
+    } else {
+      const parsed = new URL(targetRef);
+      if (parsed.hostname !== "docs.google.com" || parsed.protocol !== "https:") throw new Error("URL Google Sheets không hợp lệ.");
+      const id = parsed.pathname.match(/^\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)?.[1];
+      if (!id) throw new Error("Không tìm thấy ID bảng tính.");
+      url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(id)}/values/${encodeURIComponent(SHEET_COLUMN_MAPPING.sheetTabName + "!A1:E1")}`;
     }
-    const isLiveKey = Boolean(parsed.private_key);
-    return {
-      ok: true,
-      mode: isLiveKey ? "live" : "sandbox",
-      checkedAt,
-      message:
-        service === "drive"
-          ? `Xác thực Service Account (${parsed.client_email}) thành công — Quyền đọc thư mục ${DRIVE_FOLDER_CONVENTION} hợp lệ.`
-          : `Xác thực Service Account (${parsed.client_email}) thành công — Đọc tab "${SHEET_COLUMN_MAPPING.sheetTabName}" hợp lệ.`,
-      details: {
-        serviceAccount: parsed.client_email,
-        projectId: parsed.project_id,
-        target: cleanTarget,
-      },
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      mode: "sandbox",
-      checkedAt,
-      message: `JSON Service Account không hợp lệ: ${
-        err instanceof Error ? err.message : "Lỗi cú pháp"
-      }`,
-    };
+    const response = await client.request<{ mimeType?: string }>({ url, timeout: 8000 });
+    if (service === "drive" && response.data.mimeType !== "application/vnd.google-apps.folder") throw new Error("ID Drive không phải thư mục.");
+    return { ok: true, mode: "live", checkedAt, message: service === "drive" ? "Đã kiểm tra quyền đọc thư mục Google Drive." : "Đã kiểm tra quyền đọc tab đối soát Google Sheets." };
+  } catch {
+    return { ok: false, mode: "live", checkedAt, message: "Không thể xác thực hoặc đọc tài nguyên Google. Kiểm tra Service Account, ID/URL, chia sẻ quyền và API đã bật." };
   }
 }

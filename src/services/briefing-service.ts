@@ -12,7 +12,7 @@ import {
 import { eq, gte } from "drizzle-orm";
 import { formatCompactVnd, getDaysAgoIso, getTodayIso } from "@/lib/format";
 import { dispatchTelegramAlert } from "@/lib/telegram";
-import { resolveEffectiveSecrets } from "@/lib/api-utils";
+import { resolveEffectiveSecrets, isDemoMode } from "@/lib/api-utils";
 import { generateStructuredBriefing } from "./gemini-ai";
 import type { AiBriefingStructuredOutput } from "@/types/domain";
 
@@ -191,6 +191,10 @@ export async function createDailyAiBriefing() {
     fallbackOutput,
   });
 
+  if (!isDemoMode() && !providerUsed.includes("Live")) {
+    throw new Error("Không tạo bản tin: AI chưa cấu hình hoặc không phản hồi thành công.");
+  }
+
   const [created] = await db
     .insert(aiBriefings)
     .values({
@@ -201,11 +205,11 @@ export async function createDailyAiBriefing() {
       budgetPlanJson: output.budgetPlanJson,
       compactInputJson,
       providerUsed,
-      sentToTelegram: true,
+      sentToTelegram: false,
     })
     .returning();
 
-  await dispatchTelegramAlert({
+  const delivery = await dispatchTelegramAlert({
     streamType: "scheduled",
     alertCategory: "ai_briefing",
     title: `☀️ Bản tin AI Briefing (${providerUsed})`,
@@ -214,14 +218,19 @@ export async function createDailyAiBriefing() {
     dedupKey: `briefing_manual_${Date.now()}`,
   });
 
+  const sentToTelegram = !delivery.skipped && delivery.alert?.deliveryStatus === "sent";
+  if (sentToTelegram) {
+    await db.update(aiBriefings).set({ sentToTelegram: true }).where(eq(aiBriefings.id, created.id));
+  }
+
   await db.insert(syncLogs).values({
     jobName: "ai_briefing",
     status: "success",
     itemsProcessed: 1,
     durationMs: Date.now() - started,
     rateLimitPct: settings?.metaRateLimitPct ?? 24,
-    message: `Tạo Bản tin AI Briefing qua ${providerUsed} và gửi bản sao Telegram.`,
+    message: `Tạo Bản tin AI Briefing qua ${providerUsed}. Telegram: ${sentToTelegram ? "đã gửi" : "chưa gửi"}.`,
   });
 
-  return created;
+  return { ...created, sentToTelegram };
 }

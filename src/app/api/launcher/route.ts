@@ -1,3 +1,4 @@
+import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!isDemoMode()) return demoOnlyError();
     const result = await executePausedCampaignLaunch({
       flowType,
       body,
