@@ -102,7 +102,11 @@ export default function CreativesHubPage() {
       if (res.ok) {
         setBanner(json.message);
         await loadData();
+      } else {
+        setBanner(json.error || "Không thể đồng bộ Drive.");
       }
+    } catch {
+      setBanner("Không thể kết nối để đồng bộ Drive.");
     } finally {
       setSyncing(false);
     }
@@ -178,7 +182,7 @@ export default function CreativesHubPage() {
             Kho Creative Google Drive & Kho Post ID (Cơ chế Lai)
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            PostgreSQL chỉ lưu siêu dữ liệu (0 byte video). Quản lý Bộ đệm Video (<code>meta_media_cache</code>) & Kho bài viết (<code>meta_posts</code>).
+            Ads Manager là nguồn dữ liệu chính. CSV là bản chụp để nhập vào Sheets, không tự đồng bộ. PostgreSQL chỉ lưu siêu dữ liệu (0 byte video). Quản lý Bộ đệm Video (<code>meta_media_cache</code>) & Kho bài viết (<code>meta_posts</code>).
           </p>
         </div>
 
@@ -205,6 +209,10 @@ export default function CreativesHubPage() {
               Cache & Post ID ({allPosts.length})
             </button>
           </div>
+          <a href="/api/creatives/export" download="danh-muc-media.csv"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
+            Xuất danh mục CSV
+          </a>
           <button
             onClick={handleSyncDrive}
             disabled={syncing}
