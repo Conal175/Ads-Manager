@@ -6,7 +6,7 @@ test('quoted CSV, weighted metrics and reconciliation mismatches',()=>{
  assert.deepEqual(parseCsv('"x,y","a""b"\r\n'),[['x,y','a"b']]);
  const summary=['','','','','','','VND','300,00','200','20','4','2','2026-11-01','2026-11-25'];
  const data=parseMetaReport(csv([h,summary,row('18-24','100,00','1'),row('25-34','200,00','2')]));
- assert.deepEqual(data.differences,['messages']);const groups=summarizeMeta(data.rows);assert.equal(groups.length,1);assert.equal(groups[0].spend,300);assert.equal(groups[0].messages,3);assert.equal(groups[0].mediaCode,'M001');
+ assert.deepEqual(data.differences,['messages']);const groups=summarizeMeta(data.rows);assert.equal(groups.length,1);assert.equal(groups[0].spend,300);assert.equal(groups[0].messages,3);assert.equal(groups[0].legacyCode,'M001');
 });
 test('invalid fields and overlapping report periods do not silently pass',()=>{
  assert.throws(()=>parseMetaReport('bad,header'),/Thiếu cột/);
@@ -17,4 +17,13 @@ test('invalid fields and overlapping report periods do not silently pass',()=>{
 test('Excel cells: dates, numeric values and empty outcomes are normalized without changing totals',()=>{
  const r=row('18-24',100,'');r[12]=new Date('2026-11-01T00:00:00Z');r[13]=new Date('2026-11-25T00:00:00Z');
  const result=parseMetaRows(normalizeExcelRows([h,r]));assert.equal(result.rows.length,1);assert.equal(result.rows[0].spend,100);assert.equal(result.rows[0].start,'2026-11-01');assert.equal(result.blankOutcomes,1);
+});
+test('product-qualified media names, legacy names and distinct Meta IDs',()=>{
+ const hdr=[...h,'ID tài khoản','ID chiến dịch','ID nhóm quảng cáo','ID quảng cáo'];
+ const a=row('a','10','1');a[3]='GI_M001_VID';const b=[...a];b[0]='TK';b[4]='b';
+ const input=[hdr,[...a,'1','2','3','100000000000001'],[...b,'1','2','3','100000000000002']];
+ const groups=summarizeMeta(parseMetaRows(input).rows);assert.equal(groups.length,2);assert.equal(groups[0].mediaCode,'GI_M001');assert.equal(groups[0].adId,'100000000000001');
+ const change=[...a];change[3]='GI_M002_VID';const conflict=summarizeMeta(parseMetaRows([hdr,[...a,'1','2','3','5'],[...change,'1','2','3','5']]).rows);assert.equal(conflict.length,1);assert.equal(conflict[0].mediaCode,null);assert.equal(conflict[0].nameConflict,true);
+ const invalid=parseMetaRows([hdr,[...a,'1','2','3','1.00E+15']]);assert.equal(invalid.errors.length,1);
+ assert.throws(()=>normalizeExcelRows([hdr,[...a,'1','2','3',1234567890123456]]),/văn bản/);
 });
