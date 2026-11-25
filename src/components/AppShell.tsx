@@ -12,7 +12,6 @@ import {
   Rocket,
   BarChart3,
   Zap,
-  Activity,
   Menu,
   X,
   Lock,
@@ -28,8 +27,8 @@ const NAV_ITEMS = [
   },
   {
     href: "/assets",
-    label: "Tài sản & Kết nối Meta",
-    shortDesc: "API, BM, TKQC, Page, Pixel",
+    label: "Cài đặt và kết nối",
+    shortDesc: "Meta, Telegram & hệ thống",
     icon: ShieldCheck,
   },
   {
@@ -67,12 +66,6 @@ const NAV_ITEMS = [
     label: "Quản lý người dùng",
     shortDesc: "Cấp và thu hồi quyền",
     icon: Users,
-  },
-  {
-    href: "/system",
-    label: "Telegram & Hệ thống",
-    shortDesc: "Cron Jobs & Rate Limit",
-    icon: Activity,
   },
 ];
 

@@ -4,10 +4,12 @@ import React, { useCallback, useEffect, useState } from "react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { AssetsHealthSection } from "@/components/assets/AssetsHealthSection";
 import { ApiConnectionsForm } from "@/components/assets/ApiConnectionsForm";
+import SystemHealthSection from "@/components/system/SystemHealthSection";
 import type { MetaAssetDTO, SettingsDTO } from "@/types/domain";
 
 export default function AssetsAndConnectionsPage() {
-  const [activeTab, setActiveTab] = useState<"assets" | "connections">("assets");
+  const [activeTab, setActiveTab] = useState<"assets" | "connections" | "system">("assets");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [assets, setAssets] = useState<MetaAssetDTO[]>([]);
   const [settings, setSettings] = useState<SettingsDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,16 @@ export default function AssetsAndConnectionsPage() {
 
   useEffect(() => {
     loadAll();
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((identity) => {
+        if (!active) return;
+        const admin = identity?.role === "admin";
+        setIsAdmin(admin);
+        if (admin && new URLSearchParams(window.location.search).get("tab") === "system") setActiveTab("system");
+      }).catch(() => { if (active) setIsAdmin(false); });
+    return () => { active = false; };
   }, [loadAll]);
 
   const handleSyncAssets = async () => {
@@ -168,13 +180,13 @@ export default function AssetsAndConnectionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Trung tâm Kết nối & Giám sát Tài sản Meta
+            Cài đặt và kết nối
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Quản lý tập trung khóa API (Meta, Drive, Sheets, Telegram, Google Gemini) và theo dõi sức khỏe TKQC, Fanpage, Pixel.
+            Quản lý kết nối, giám sát tài sản Meta và theo dõi Telegram & hệ thống.
           </p>
         </div>
-        <div className="inline-flex rounded-lg bg-slate-200/70 p-1">
+        <div className="inline-flex flex-wrap rounded-lg bg-slate-200/70 p-1">
           <button
             onClick={() => setActiveTab("assets")}
             className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors ${
@@ -195,6 +207,10 @@ export default function AssetsAndConnectionsPage() {
           >
             Cấu hình API tập trung
           </button>
+          {isAdmin && <button
+            onClick={() => setActiveTab("system")}
+            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors ${activeTab === "system" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"}`}
+          >Telegram & Hệ thống</button>}
         </div>
       </div>
 
@@ -204,7 +220,9 @@ export default function AssetsAndConnectionsPage() {
         onClose={() => setBanner(null)}
       />
 
-      {loading ? (
+      {activeTab === "system" && isAdmin ? (
+        <SystemHealthSection />
+      ) : loading ? (
         <div className="h-64 bg-white rounded-xl border border-slate-200 animate-pulse" />
       ) : activeTab === "assets" ? (
         <AssetsHealthSection
