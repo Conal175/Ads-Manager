@@ -14,7 +14,6 @@ import {
   Zap,
   Menu,
   X,
-  Users,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -53,12 +52,6 @@ const NAV_ITEMS = [
     label: "Trung tâm Đề xuất",
     shortDesc: "Kill, Scale, Fatigue, Leak",
     icon: Zap,
-  },
-  {
-    href: "/users",
-    label: "Quản lý người dùng",
-    shortDesc: "Cấp và thu hồi quyền",
-    icon: Users,
   },
 ];
 
@@ -170,7 +163,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="p-3 border-t border-slate-100">
-          {canViewPage(role, "/assets") && <Link href="/assets" onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors ${pathname.startsWith("/assets") || pathname.startsWith("/system") ? "border-indigo-100 bg-indigo-50 text-indigo-700" : "border-transparent text-slate-600 hover:bg-slate-50"}`}>
+          {canViewPage(role, "/assets") && <Link href="/assets" onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors ${pathname.startsWith("/assets") || pathname.startsWith("/system") || pathname.startsWith("/users") ? "border-indigo-100 bg-indigo-50 text-indigo-700" : "border-transparent text-slate-600 hover:bg-slate-50"}`}>
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700"><Settings2 className="h-[18px] w-[18px]" /></span>
             <span className="min-w-0"><span className="block text-[13px] font-semibold">Cài đặt và kết nối</span><span className="block text-[11px] text-slate-500">Tài khoản, Meta & hệ thống</span></span>
           </Link>}
