@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { canViewPage, type AppRole } from "@/lib/auth/policy";
 import {
   LayoutDashboard,
-  ShieldCheck,
+  Settings2,
   Package,
   Film,
   Rocket,
@@ -14,7 +14,6 @@ import {
   Zap,
   Menu,
   X,
-  Lock,
   Users,
 } from "lucide-react";
 
@@ -24,12 +23,6 @@ const NAV_ITEMS = [
     label: "Tổng quan & AI Briefing",
     shortDesc: "Bản tin 07:30 & Pacing",
     icon: LayoutDashboard,
-  },
-  {
-    href: "/assets",
-    label: "Cài đặt và kết nối",
-    shortDesc: "Meta, Telegram & hệ thống",
-    icon: ShieldCheck,
   },
   {
     href: "/products",
@@ -82,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (pathname === "/login" || pathname === "/register" || pathname === "/no-access" || pathname.startsWith("/auth/")) return <>{children}</>;
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-[#f8fafc]">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-[#f5f7fc]">
       {/* Mobile Top Bar */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-slate-200">
         <Link href="/" className="flex items-center gap-2.5">
@@ -115,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-[256px] shrink-0 bg-white border-r border-slate-200 flex flex-col transition-transform duration-200 ${
+        className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-[256px] shrink-0 bg-white border-r border-slate-200/80 flex flex-col transition-transform duration-200 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >
@@ -133,7 +126,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-1">
           {NAV_ITEMS.filter((item) => canViewPage(role, item.href)).map((item) => {
             const Icon = item.icon;
             const active =
@@ -148,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 onClick={() => setMobileOpen(false)}
                 className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                   active
-                    ? "bg-blue-50 text-blue-700 font-semibold border border-blue-100"
+                    ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent"
                 }`}
               >
@@ -176,26 +169,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Safety Footer Badge */}
-        <div className="p-3 border-t border-slate-100 space-y-2">
-          <Link href="/login" className="block text-sm text-blue-700 px-3">Đăng nhập / đổi tài khoản</Link>
-          <button className="block text-sm text-slate-600 px-3" onClick={async () => {
-            const res = await fetch("/api/auth/logout", { method: "POST" });
-            if (res.ok) window.location.assign("/login");
-            else window.alert("Không thể đăng xuất. Vui lòng thử lại.");
-          }}>Đăng xuất</button>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200/70">
-            <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-            <div className="text-[11px] text-emerald-800 leading-snug">
-              <span className="font-semibold">Chế độ an toàn:</span> Mọi lệnh lên
-              Ads khóa cứng <code className="font-mono font-bold">PAUSED</code>
-            </div>
-          </div>
+        <div className="p-3 border-t border-slate-100">
+          {canViewPage(role, "/assets") && <Link href="/assets" onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors ${pathname.startsWith("/assets") || pathname.startsWith("/system") ? "border-indigo-100 bg-indigo-50 text-indigo-700" : "border-transparent text-slate-600 hover:bg-slate-50"}`}>
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700"><Settings2 className="h-[18px] w-[18px]" /></span>
+            <span className="min-w-0"><span className="block text-[13px] font-semibold">Cài đặt và kết nối</span><span className="block text-[11px] text-slate-500">Tài khoản, Meta & hệ thống</span></span>
+          </Link>}
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0">
+      <main className="app-content flex-1 min-w-0">
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </div>

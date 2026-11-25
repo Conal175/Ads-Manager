@@ -32,3 +32,18 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Shared visual language for application pages; action colors remain owned by each feature. */
+.app-content { background: radial-gradient(ellipse at top right, #eef2ff 0, transparent 34%), #f5f7fc; }
+.app-content h1 { letter-spacing: -0.035em; }
+.app-content :where(button, a, input, select, textarea) { transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease, color 160ms ease; }
+.app-content :where(button, a, input, select, textarea):focus-visible { outline: 3px solid #818cf8; outline-offset: 2px; }
+.app-content :where(button:not(:disabled)) { cursor: pointer; }
+.app-content :where(button:disabled) { cursor: not-allowed; }
+.app-content :where(input, select, textarea) { border-color: #cbd5e1; }
+.app-content :where(input, select, textarea):focus { border-color: #818cf8; }
+.app-content :where(table) { border-collapse: collapse; }
+.app-content :where(tbody tr:hover) { background-color: #f8faff; }
+.app-content :where(.bg-white.rounded-xl, .bg-white.rounded-2xl) { box-shadow: 0 4px 20px -12px rgba(42, 55, 90, 0.2); }
+.app-content :where(button.bg-blue-600) { background-color: #4f46e5; box-shadow: 0 4px 12px -5px rgba(79, 70, 229, 0.6); }
+.app-content :where(button.bg-blue-600:hover:not(:disabled)) { background-color: #4338ca; }

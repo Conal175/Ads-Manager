@@ -21,14 +21,17 @@ export default function LoginPage() {
     } catch { setError("Không thể kết nối. Vui lòng thử lại."); }
     finally { setBusy(false); }
   }
-  return <main className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
-    <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-4">
-      <div><h1 className="text-xl font-bold">Đăng nhập AdsPulse OS</h1><p className="text-sm text-slate-500 mt-1">Dùng tài khoản đã được quản trị viên cấp quyền.</p></div>
-      <label className="block text-sm font-medium">Email<input type="email" required autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
-      <label className="block text-sm font-medium">Mật khẩu<input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border p-2" /></label>
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <button disabled={busy} className="w-full rounded-lg bg-blue-600 text-white p-2 disabled:opacity-50">{busy ? "Đang đăng nhập…" : "Đăng nhập"}</button>
-      <p className="text-sm text-slate-600">Chưa có tài khoản? <Link href="/register" className="text-blue-700">Đăng ký</Link></p>
-    </form>
+  return <main className="min-h-screen flex items-center justify-center p-5 bg-[#f4f6fd]" style={{backgroundImage: "radial-gradient(circle at 15% 10%, #e0e7ff, transparent 40%), radial-gradient(circle at 90% 90%, #dbeafe, transparent 35%)"}}>
+    <div className="w-full max-w-md">
+      <div className="mb-7 flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-600 text-sm font-bold text-white shadow-lg shadow-indigo-200">AP</div><div><div className="font-bold text-slate-900">AdsPulse OS</div><div className="text-xs text-slate-500">Không gian quản lý quảng cáo</div></div></div>
+      <form onSubmit={submit} className="w-full bg-white rounded-3xl border border-white p-7 sm:p-9 shadow-xl shadow-slate-200/70 space-y-5">
+        <div><p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-600">Chào mừng trở lại</p><h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">Đăng nhập</h1><p className="text-sm text-slate-500 mt-2">Dùng tài khoản đã được quản trị viên cấp quyền.</p></div>
+        <label className="block text-sm font-semibold text-slate-700">Email<input type="email" required autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" /></label>
+        <label className="block text-sm font-semibold text-slate-700">Mật khẩu<input type="password" required autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100" /></label>
+        {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        <button disabled={busy} className="w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 disabled:opacity-50">{busy ? "Đang đăng nhập…" : "Đăng nhập"}</button>
+        <p className="text-center text-sm text-slate-500">Chưa có tài khoản? <Link href="/register" className="font-semibold text-indigo-700 hover:underline">Đăng ký</Link></p>
+      </form>
+    </div>
   </main>;
 }
