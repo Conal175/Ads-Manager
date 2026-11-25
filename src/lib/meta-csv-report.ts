@@ -25,7 +25,13 @@ function validDate(value:string) {
   const d=new Date(value+'T00:00:00Z'); return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10)===value;
 }
 export function parseMetaReport(text:string) {
-  const data=parseCsv(text); if(!data.length) throw new Error('File CSV trống.');
+  return parseMetaRows(parseCsv(text));
+}
+export function normalizeExcelRows(data: (string|number|boolean|Date|null)[][]):string[][] {
+  return data.map(row=>row.map(cell=>cell instanceof Date?(Number.isFinite(cell.getTime())?cell.toISOString().slice(0,10):''):cell==null?'':String(cell)));
+}
+export function parseMetaRows(data:string[][]) {
+  if(!data.length) throw new Error('Trang tính hoặc file trống.');
   const headers=data[0].map(x=>x.trim()); const indices=Object.fromEntries(Object.entries(names).map(([key,name])=>[key,headers.indexOf(name)])) as Record<keyof typeof names,number>;
   const missing=Object.entries(names).filter(([key])=>indices[key as keyof typeof names]===-1).map(([,name])=>name);
   if(missing.length) throw new Error('Thiếu cột: '+missing.join(', '));

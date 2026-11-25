@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {parseCsv,parseMetaReport,summarizeMeta} from '../src/lib/meta-csv-report.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseCsv,parseMetaReport,parseMetaRows,normalizeExcelRows,summarizeMeta} from '../src/lib/meta-csv-report.ts';
 const h=['Tên tài khoản','Tên chiến dịch','Tên nhóm quảng cáo','Tên quảng cáo','Độ tuổi','Giới tính','Đơn vị tiền tệ','Số tiền đã chi tiêu (VND)','Lượt hiển thị','Lượt click (tất cả)','Lượt bắt đầu cuộc trò chuyện qua tin nhắn','Lượt mua','Lượt bắt đầu báo cáo','Lượt kết thúc báo cáo'];
 const csv=r=>r.map(row=>row.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\n');
 const row=(age,spend,msg)=>['TK','2311_MESS_Gi_113_C01','Broad_35-65_Tỉnh','M001_VID',age,'female','VND',spend,'100','10',msg,'1','2026-11-01','2026-11-25'];
@@ -12,4 +12,9 @@ test('invalid fields and overlapping report periods do not silently pass',()=>{
  assert.throws(()=>parseMetaReport('bad,header'),/Thiếu cột/);
  const bad=row('18-24','1,234,567','');const parsed=parseMetaReport(csv([h,bad]));assert.equal(parsed.errors.length,1);
  const a=row('a','10','');const b=row('b','10','');b[12]='2026-11-02';assert.throws(()=>parseMetaReport(csv([h,a,b])),/nhiều kỳ/);
+});
+
+test('Excel cells: dates, numeric values and empty outcomes are normalized without changing totals',()=>{
+ const r=row('18-24',100,'');r[12]=new Date('2026-11-01T00:00:00Z');r[13]=new Date('2026-11-25T00:00:00Z');
+ const result=parseMetaRows(normalizeExcelRows([h,r]));assert.equal(result.rows.length,1);assert.equal(result.rows[0].spend,100);assert.equal(result.rows[0].start,'2026-11-01');assert.equal(result.blankOutcomes,1);
 });
