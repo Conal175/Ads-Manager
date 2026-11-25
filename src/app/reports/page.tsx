@@ -1,6 +1,7 @@
 "use client";
 
 import React, { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BarChart3, RefreshCw, Film, Flame, DollarSign } from "lucide-react";
 import { getDaysAgoIso, getTodayIso } from "@/lib/format";
@@ -204,6 +205,7 @@ function ReportsInner() {
             Truy vấn tức thì từ PostgreSQL nội bộ (không nghẽn Rate Limit Meta). Ghép đúng phiên bản KPI theo từng ngày.
           </p>
         </div>
+        <Link href="/reports/import" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Phân tích file Meta CSV</Link>
         <button
           onClick={handleRefreshNow}
           disabled={refreshing}
