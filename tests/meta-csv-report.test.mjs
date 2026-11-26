@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {parseCsv,parseMetaReport,parseMetaRows,normalizeExcelRows,summarizeMeta} from '../src/lib/meta-csv-report.ts';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {parseCsv,parseMetaReport,parseMetaRows,normalizeExcelRows,excelIdPrecisionWarnings,summarizeMeta} from '../src/lib/meta-csv-report.ts';
 const h=['Tên tài khoản','Tên chiến dịch','Tên nhóm quảng cáo','Tên quảng cáo','Độ tuổi','Giới tính','Đơn vị tiền tệ','Số tiền đã chi tiêu (VND)','Lượt hiển thị','Lượt click (tất cả)','Lượt bắt đầu cuộc trò chuyện qua tin nhắn','Lượt mua','Lượt bắt đầu báo cáo','Lượt kết thúc báo cáo'];
 const csv=r=>r.map(row=>row.map(x=>'"'+String(x).replaceAll('"','""')+'"').join(',')).join('\n');
 const row=(age,spend,msg)=>['TK','2311_MESS_Gi_113_C01','Broad_35-65_Tỉnh','M001_VID',age,'female','VND',spend,'100','10',msg,'1','2026-11-01','2026-11-25'];
@@ -25,10 +25,11 @@ test('product-qualified media names, legacy names and distinct Meta IDs',()=>{
  const groups=summarizeMeta(parseMetaRows(input).rows);assert.equal(groups.length,2);assert.equal(groups[0].mediaCode,'GI_M001');assert.equal(groups[0].adId,'100000000000001');
  const change=[...a];change[3]='GI_M002_VID';const conflict=summarizeMeta(parseMetaRows([hdr,[...a,'1','2','3','5'],[...change,'1','2','3','5']]).rows);assert.equal(conflict.length,1);assert.equal(conflict[0].mediaCode,null);assert.equal(conflict[0].nameConflict,true);
  const invalid=parseMetaRows([hdr,[...a,'1','2','3','1.00E+15']]);assert.equal(invalid.errors.length,1);
- assert.throws(()=>normalizeExcelRows([hdr,[...a,'1','2','3',1234567890123456]]),/văn bản/);
+ assert.equal(excelIdPrecisionWarnings([hdr,[...a,'1','2','3',1234567890123456]]),1);
 });
-test('Mã quảng cáo is accepted as ad ID and numeric Excel IDs are rejected',()=>{
+test('Mã quảng cáo accepts numeric cells and flags potentially rounded long IDs',()=>{
  const hdr=[...h,'Mã quảng cáo']; const r=row('18-24','10','1');
  assert.equal(parseMetaRows([hdr,[...r,'120254017818060577']]).rows[0].adId,'120254017818060577');
- assert.throws(()=>normalizeExcelRows([hdr,[...r,120254017818060577]]),/văn bản/);
+ const numeric=[hdr,[...r,{rawNumber:'120254017818060577'}]]; assert.equal(excelIdPrecisionWarnings(numeric),1);assert.equal(parseMetaRows(normalizeExcelRows(numeric)).rows[0].adId,'120254017818060577');
+ assert.equal(excelIdPrecisionWarnings([hdr,[...r,{rawNumber:'12345'}]]),0);assert.equal(parseMetaRows(normalizeExcelRows([hdr,[...r,12345]])).rows[0].adId,'12345');
 });

@@ -33,11 +33,16 @@ function validDate(value:string) {
 export function parseMetaReport(text:string) {
   return parseMetaRows(parseCsv(text));
 }
-export function normalizeExcelRows(data: (string|number|boolean|Date|null)[][]):string[][] {
+// Custom XLSX numeric wrapper preserves the exact value stored in the file.
+export type ExcelNumber = {rawNumber:string};
+type ExcelCell = string|number|boolean|Date|null|ExcelNumber;
+export function excelIdPrecisionWarnings(data: ExcelCell[][]):number {
   const header=(data[0]??[]).map(v=>typeof v==='string'?v.trim():'');
-  const idIndices=Object.values(idHeaders).flatMap(aliases=>aliases.map(h=>header.indexOf(h)).filter(i=>i>=0));
-  if(data.slice(1).some(row=>idIndices.some(i=>typeof row[i]==='number'))) throw new Error('Cột ID trong Excel phải lưu dạng văn bản để tránh mất chữ số. Hãy xuất CSV hoặc đặt cột ID là văn bản trước khi xuất lại.');
-  return data.map(row=>row.map(cell=>cell instanceof Date?(Number.isFinite(cell.getTime())?cell.toISOString().slice(0,10):''):cell==null?'':String(cell)));
+  const indices=Object.values(idHeaders).flatMap(aliases=>aliases.map(h=>header.indexOf(h)).filter(i=>i>=0));
+  return data.slice(1).reduce((count,row)=>count+indices.filter(i=>{const v=row[i];if(typeof v==='number') return !Number.isSafeInteger(v)||Math.abs(v)>=1e15;if(v && typeof v==='object' && !(v instanceof Date) && 'rawNumber' in v){return !/^\d{1,15}$/.test(v.rawNumber);}return false;}).length,0);
+}
+export function normalizeExcelRows(data: ExcelCell[][]):string[][] {
+  return data.map(row=>row.map(cell=>cell instanceof Date?(Number.isFinite(cell.getTime())?cell.toISOString().slice(0,10):''):cell==null?'':typeof cell==='object'?cell.rawNumber:String(cell)));
 }
 export function parseMetaRows(data:string[][]) {
   if(!data.length) throw new Error('Trang tính hoặc file trống.');
