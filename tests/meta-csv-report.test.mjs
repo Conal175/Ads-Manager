@@ -27,3 +27,8 @@ test('product-qualified media names, legacy names and distinct Meta IDs',()=>{
  const invalid=parseMetaRows([hdr,[...a,'1','2','3','1.00E+15']]);assert.equal(invalid.errors.length,1);
  assert.throws(()=>normalizeExcelRows([hdr,[...a,'1','2','3',1234567890123456]]),/văn bản/);
 });
+test('Mã quảng cáo is accepted as ad ID and numeric Excel IDs are rejected',()=>{
+ const hdr=[...h,'Mã quảng cáo']; const r=row('18-24','10','1');
+ assert.equal(parseMetaRows([hdr,[...r,'120254017818060577']]).rows[0].adId,'120254017818060577');
+ assert.throws(()=>normalizeExcelRows([hdr,[...r,120254017818060577]]),/văn bản/);
+});

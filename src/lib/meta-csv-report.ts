@@ -18,7 +18,7 @@ const idHeaders = {
   accountId: ['ID tài khoản', 'ID tài khoản quảng cáo', 'Account ID'],
   campaignId: ['ID chiến dịch', 'Campaign ID'],
   adsetId: ['ID nhóm quảng cáo', 'Ad Set ID'],
-  adId: ['ID quảng cáo', 'Ad ID'],
+  adId: ['ID quảng cáo', 'Mã quảng cáo', 'Ad ID'],
 } as const;
 function numberValue(v:string, emptyAsZero=false):number|null {
   v=v.trim(); if(!v) return emptyAsZero?0:null;
