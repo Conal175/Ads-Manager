@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { DriveCreativeGrid } from "@/components/creatives/DriveCreativeGrid";
 import { PostIdAndCacheSection } from "@/components/creatives/PostIdAndCacheSection";
@@ -12,6 +11,7 @@ import {
   type NewCreativeFormState,
 } from "@/components/creatives/CreativeModals";
 import type { CreativeDTO, MediaCacheDTO, MetaPostDTO } from "@/types/domain";
+import type { DriveSelection } from "@/lib/drive-import-plan";
 
 export default function CreativesHubPage() {
   const [tab, setTab] = useState<"drive" | "cache_posts">("drive");
@@ -25,9 +25,10 @@ export default function CreativesHubPage() {
     Array<{ metaId: string; name: string }>
   >([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
   const [previewingDrive, setPreviewingDrive] = useState(false);
-  const [drivePreview, setDrivePreview] = useState<{files: Array<{id:string; name:string; productCode:string; month:string; mimeType:string; status:string}>; warnings:string[]; counts:Record<string, number>} | null>(null);
+  const [drivePreview, setDrivePreview] = useState<{files: Array<DriveSelection & {status:string}>; warnings:string[]; counts:Record<string, number>} | null>(null);
+  const [selectedDriveIds, setSelectedDriveIds] = useState<string[]>([]);
+  const [importingDrive, setImportingDrive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
   const [filterProduct, setFilterProduct] = useState("ALL");
@@ -91,32 +92,9 @@ export default function CreativesHubPage() {
     loadData();
   }, [loadData]);
 
-  const handleSyncDrive = async () => {
-    setSyncing(true);
-    setBanner(null);
-    try {
-      const res = await fetch("/api/creatives", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync_drive" }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setBanner(json.message);
-        await loadData();
-      } else {
-        setBanner(json.error || "Không thể đồng bộ Drive.");
-      }
-    } catch {
-      setBanner("Không thể kết nối để đồng bộ Drive.");
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const driveStatusLabel: Record<string, string> = {new:"Mới", existing:"Đã có", unknown_product:"Chưa có sản phẩm", product_conflict:"Khác sản phẩm đã lưu", duplicate_file:"Trùng ID file", ambiguous_product:"Mã sản phẩm không duy nhất"};
   const handlePreviewDrive = async () => {
-    setPreviewingDrive(true); setBanner(null); setDrivePreview(null);
+    setPreviewingDrive(true); setBanner(null); setDrivePreview(null); setSelectedDriveIds([]);
     try {
       const res = await fetch("/api/creatives", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"preview_drive"})});
       const json = await res.json();
@@ -124,6 +102,20 @@ export default function CreativesHubPage() {
       else { setDrivePreview(json); setBanner(json.message); }
     } catch { setBanner("Không thể kết nối để xem trước Drive."); }
     finally { setPreviewingDrive(false); }
+  };
+
+  const handleImportDrive = async () => {
+    if (!drivePreview || importingDrive || !selectedDriveIds.length) return;
+    const selected = drivePreview.files.filter(f => selectedDriveIds.includes(f.id));
+    if (!window.confirm(`Nhập metadata của ${selected.length} media đã chọn vào kho? File vẫn nằm trên Drive; không ghi Sheet hoặc Meta.`)) return;
+    setImportingDrive(true); setBanner(null);
+    try {
+      const res = await fetch('/api/creatives/import-drive', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({confirm:true, selected}) });
+      const json = await res.json();
+      if (!res.ok) { setBanner(json.error || 'Không thể nhập metadata.'); return; }
+      setDrivePreview(null); setSelectedDriveIds([]); setBanner(json.message); await loadData();
+    } catch { setBanner('Không thể xác nhận kết quả. Hãy tải lại kho và xem trước Drive để kiểm tra trước khi thử lại.'); }
+    finally { setImportingDrive(false); }
   };
 
   const handleLifecycleChange = async (
@@ -228,17 +220,9 @@ export default function CreativesHubPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
             Xuất danh mục CSV
           </a>
-          <button onClick={handlePreviewDrive} disabled={previewingDrive}
+          <button onClick={handlePreviewDrive} disabled={previewingDrive || importingDrive}
             className="inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60">
             {previewingDrive ? "Đang đọc Drive..." : "Xem trước Drive"}
-          </button>
-          <button
-            onClick={handleSyncDrive}
-            disabled={syncing}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Đang quét Drive..." : "Đồng bộ Drive"}
           </button>
         </div>
       </div>
@@ -248,7 +232,9 @@ export default function CreativesHubPage() {
         <div className="flex justify-between gap-3"><h2 className="font-semibold">Xem trước Drive: {drivePreview.files.length} file — chưa nhập dữ liệu</h2><button onClick={() => setDrivePreview(null)} className="text-blue-700">Đóng</button></div>
         <p className="mt-2 text-slate-500">Chỉ hiển thị 100 file đầu. Ảnh và video theo cấu trúc mã sản phẩm/tháng; không thay đổi file hoặc cơ sở dữ liệu.</p>
         <p className="mt-2 text-slate-600">{Object.entries(drivePreview.counts).map(([status,count]) => `${driveStatusLabel[status] ?? status}: ${count}`).join(" · ")}</p>
-        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.slice(0, 100).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all">{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}</li>)}</ul>
+        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.slice(0, 100).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all"><label><input type="checkbox" className="mr-2" disabled={f.status !== 'new' || importingDrive || (!selectedDriveIds.includes(f.id) && selectedDriveIds.length >= 50)} checked={selectedDriveIds.includes(f.id)} onChange={e => setSelectedDriveIds(current => e.target.checked ? [...current, f.id] : current.filter(id => id !== f.id))} />{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}{f.sizeBytes && Number(f.sizeBytes) >= 80_000_000 ? ' · ≥ 80 MB' : ''}</label></li>)}</ul>
+        <p className="mt-3 text-slate-500">Chọn tối đa 50 file mới mỗi lần. Tên file phải bắt đầu bằng mã media duy nhất, ví dụ M001_ten.mp4. Nếu có file đổi hoặc trùng, toàn bộ lượt nhập sẽ dừng.</p>
+        <button type="button" onClick={handleImportDrive} disabled={!selectedDriveIds.length || importingDrive || previewingDrive} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{importingDrive ? 'Đang nhập…' : `Nhập metadata đã chọn (${selectedDriveIds.length})`}</button>
         {drivePreview.warnings.length > 0 && <details className="mt-3 text-amber-700"><summary>{drivePreview.warnings.length} mục bị bỏ qua</summary><ul className="max-h-40 overflow-auto">{drivePreview.warnings.slice(0,100).map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
       </section>}
 
