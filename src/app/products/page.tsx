@@ -19,6 +19,10 @@ export default function ProductsKpiPage() {
   const [banner, setBanner] = useState<string | null>(null);
 
   const [showNewProductModal, setShowNewProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<ProductWithKpiDTO | null>(null);
+  const [editForm, setEditForm] = useState({ code: "", name: "", category: "" });
+  const [editError, setEditError] = useState("");
+  const [editBusy, setEditBusy] = useState(false);
   const [editingKpiProduct, setEditingKpiProduct] =
     useState<ProductWithKpiDTO | null>(null);
   const [historyProduct, setHistoryProduct] =
@@ -61,6 +65,31 @@ export default function ProductsKpiPage() {
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  const openEditProduct = (prod: ProductWithKpiDTO) => {
+    setEditingProduct(prod);
+    setEditForm({ code: prod.code, name: prod.name, category: prod.category });
+    setEditError("");
+  };
+
+  const saveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct || editBusy) return;
+    setEditBusy(true);
+    setEditError("");
+    try {
+      const res = await fetch(`/api/products/${editingProduct.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editForm, expectedCode: editingProduct.code }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setEditError(json.error || "Không thể cập nhật sản phẩm."); return; }
+      setEditingProduct(null);
+      setBanner(`Đã cập nhật sản phẩm ${json.product.code}.`);
+      await loadProducts();
+    } catch { setEditError("Không thể kết nối. Vui lòng thử lại."); }
+    finally { setEditBusy(false); }
+  };
 
   const openEditKpi = (prod: ProductWithKpiDTO) => {
     const cur = prod.currentKpi;
@@ -228,11 +257,26 @@ export default function ProductsKpiPage() {
             <ProductKpiCard
               key={prod.id}
               prod={prod}
+              onEditProduct={openEditProduct}
               onOpenHistory={setHistoryProduct}
               onOpenBudget={openEditBudget}
               onOpenNewVersion={openEditKpi}
             />
           ))}
+        </div>
+      )}
+
+      {editingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="edit-product-title">
+          <form onSubmit={saveProduct} className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
+            <h2 id="edit-product-title" className="text-lg font-bold">Chỉnh sửa sản phẩm</h2>
+            <p className="text-sm text-slate-600">Đổi mã không tự sửa tên trên Meta, Sheet hoặc Drive. Mã có dữ liệu liên quan sẽ bị chặn để tránh sai lệch. KPI và ngân sách chỉnh ở mục riêng.</p>
+            {([['code', 'Mã sản phẩm'], ['name', 'Tên sản phẩm'], ['category', 'Danh mục']] as const).map(([key, label]) => (
+              <label key={key} className="block text-sm font-medium text-slate-700">{label}<input required maxLength={key === 'code' ? 40 : 200} value={editForm[key]} onChange={e => setEditForm({ ...editForm, [key]: e.target.value })} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+            ))}
+            {editError && <p role="alert" className="text-sm text-red-700">{editError}</p>}
+            <div className="flex justify-end gap-2"><button type="button" disabled={editBusy} onClick={() => setEditingProduct(null)} className="rounded-lg border px-4 py-2 text-sm">Hủy</button><button disabled={editBusy} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{editBusy ? 'Đang lưu…' : 'Lưu thay đổi'}</button></div>
+          </form>
         </div>
       )}
 

@@ -7,6 +7,7 @@ import type { ProductWithKpiDTO } from "@/types/domain";
 
 interface ProductKpiCardProps {
   prod: ProductWithKpiDTO;
+  onEditProduct: (prod: ProductWithKpiDTO) => void;
   onOpenHistory: (prod: ProductWithKpiDTO) => void;
   onOpenBudget: (prod: ProductWithKpiDTO) => void;
   onOpenNewVersion: (prod: ProductWithKpiDTO) => void;
@@ -14,6 +15,7 @@ interface ProductKpiCardProps {
 
 export function ProductKpiCard({
   prod,
+  onEditProduct,
   onOpenHistory,
   onOpenBudget,
   onOpenNewVersion,
@@ -53,6 +55,7 @@ export function ProductKpiCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => onEditProduct(prod)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50">Chỉnh sửa sản phẩm</button>
           <button
             onClick={() => onOpenHistory(prod)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200"
