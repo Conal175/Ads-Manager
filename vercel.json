@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/media-sheet-sync",
+      "schedule": "0 20 * * *"
+    }
+  ]
+}
