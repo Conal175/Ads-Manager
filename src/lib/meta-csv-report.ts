@@ -1,5 +1,5 @@
 /** Meta report preview. This module deliberately never persists imported data. */
-export type ReportRow = { accountId:string; campaignId:string; adsetId:string; adId:string; account:string; campaign:string; adset:string; ad:string; age:string; gender:string; currency:string; spend:number; impressions:number; clicks:number; messages:number; purchases:number; start:string; end:string };
+export type ReportRow = { accountId:string; campaignId:string; adsetId:string; adId:string; account:string; campaign:string; adset:string; ad:string; age:string; gender:string; currency:string; spend:number; impressions:number; clicks:number; messages:number; purchases:number; registrations:number|null; messagesBlank:boolean; purchasesBlank:boolean; registrationsBlank:boolean; start:string; end:string };
 export function parseCsv(text:string): string[][] {
   const rows:string[][]=[]; let row:string[]=[], cell='', quoted=false;
   text=text.replace(/^\uFEFF/,'');
@@ -44,25 +44,30 @@ export function parseMetaRows(data:string[][]) {
   const headers=data[0].map(x=>x.trim()); const indices=Object.fromEntries(Object.entries(names).map(([key,name])=>[key,headers.indexOf(name)])) as Record<keyof typeof names,number>;
   const missing=Object.entries(names).filter(([key])=>indices[key as keyof typeof names]===-1).map(([,name])=>name);
   if(missing.length) throw new Error('Thiếu cột: '+missing.join(', '));
+  const registrationIndex=headers.indexOf('Lượt đăng ký hoàn tất');
   const idIndices=Object.fromEntries(Object.entries(idHeaders).map(([key,aliases])=>[key,aliases.map(name=>headers.indexOf(name)).find(i=>i>=0)??-1])) as Record<keyof typeof idHeaders,number>;
-  const rows:ReportRow[]=[]; const errors:{line:number;message:string}[]=[]; let totals=0; let summary: {spend:number|null;impressions:number|null;clicks:number|null;messages:number|null;purchases:number|null}|null=null; let blankOutcomes=0;
+  const rows:ReportRow[]=[]; const errors:{line:number;message:string}[]=[]; let totals=0; let summary: {spend:number|null;impressions:number|null;clicks:number|null;messages:number|null;purchases:number|null;registrations:number|null}|null=null; let blankOutcomes=0;
   data.slice(1).forEach((r,i)=>{
     if(r.every(v=>!v.trim())) return; const get=(k:keyof typeof names)=>(r[indices[k]]??'').trim();
-    if(!get('account')&&!get('campaign')&&!get('adset')&&!get('ad')){totals++; if(totals===1) summary={spend:numberValue(get('spend')),impressions:numberValue(get('impressions')),clicks:numberValue(get('clicks')),messages:numberValue(get('messages')),purchases:numberValue(get('purchases'))};return;}
+    if(!get('account')&&!get('campaign')&&!get('adset')&&!get('ad')){totals++; if(totals===1) summary={spend:numberValue(get('spend')),impressions:numberValue(get('impressions')),clicks:numberValue(get('clicks')),messages:numberValue(get('messages')),purchases:numberValue(get('purchases')),registrations:registrationIndex<0?null:numberValue((r[registrationIndex]??'').trim())};return;}
     const ids=Object.fromEntries(Object.entries(idIndices).map(([key,index])=>[key,index<0?'':(r[index]??'').trim()])) as Record<keyof typeof idHeaders,string>;
     if(Object.values(ids).some(id=>id && !/^\d+$/.test(id))){errors.push({line:i+2,message:'ID Meta không hợp lệ; cần là chuỗi số đầy đủ.'});return;}
     if (!get('messages') || !get('purchases')) blankOutcomes++;
     const spend=numberValue(get('spend')),impressions=numberValue(get('impressions')),clicks=numberValue(get('clicks'));
     const messages=numberValue(get('messages'),true),purchases=numberValue(get('purchases'),true);
+    const registrationText=registrationIndex<0?'':(r[registrationIndex]??'').trim();
+    const registrations=registrationIndex<0?null:numberValue(registrationText,true);
     const start=get('start'),end=get('end');
-    if(!get('account')||!get('campaign')||!get('adset')||!get('ad')||get('currency')!=='VND'||spend===null||impressions===null||clicks===null||messages===null||purchases===null||![impressions,clicks,messages,purchases].every(Number.isSafeInteger)||!validDate(start)||!validDate(end)||start>end){errors.push({line:i+2,message:'Thiếu định danh, sai số, tiền tệ hoặc kỳ báo cáo.'});return;}
-    rows.push({...ids,account:get('account'),campaign:get('campaign'),adset:get('adset'),ad:get('ad'),age:get('age'),gender:get('gender'),currency:'VND',spend,impressions,clicks,messages,purchases,start,end});
+    if(!get('account')||!get('campaign')||!get('adset')||!get('ad')||get('currency')!=='VND'||spend===null||impressions===null||clicks===null||messages===null||purchases===null||(registrationIndex>=0&&(registrations===null||!Number.isSafeInteger(registrations)))||![impressions,clicks,messages,purchases].every(Number.isSafeInteger)||!validDate(start)||!validDate(end)||start>end){errors.push({line:i+2,message:'Thiếu định danh, sai số, tiền tệ hoặc kỳ báo cáo.'});return;}
+    rows.push({...ids,account:get('account'),campaign:get('campaign'),adset:get('adset'),ad:get('ad'),age:get('age'),gender:get('gender'),currency:'VND',spend,impressions,clicks,messages,purchases,registrations,messagesBlank:!get('messages'),purchasesBlank:!get('purchases'),registrationsBlank:!registrationText,start,end});
   });
   const periods=new Set(rows.map(r=>`${r.start}/${r.end}`));
   if(periods.size>1) throw new Error('File có nhiều kỳ báo cáo; không cộng các kỳ có thể chồng lấn.');
   const detailTotals=rows.reduce((acc,r)=>({spend:acc.spend+r.spend,impressions:acc.impressions+r.impressions,clicks:acc.clicks+r.clicks,messages:acc.messages+r.messages,purchases:acc.purchases+r.purchases}),{spend:0,impressions:0,clicks:0,messages:0,purchases:0});
   const differences: string[]=[];
   if(summary && totals===1) for(const key of ['spend','impressions','clicks','messages','purchases'] as const) {const expected=(summary as Record<string,number|null>)[key];if(expected!==null && Math.abs(expected-detailTotals[key])>0.01) differences.push(key);}
+  const registrationSummary=(summary as {registrations:number|null}|null)?.registrations;
+  if(totals===1 && registrationSummary!=null && registrationSummary!==rows.reduce((n,r)=>n+(r.registrations??0),0)) differences.push('registrations');
   if(totals>1) differences.push('multiple_totals');
   return {rows,errors,totals,blankOutcomes,differences,period:rows.length?`${rows[0].start} — ${rows[0].end}`:null};
 }
