@@ -1,0 +1,9 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {reportInsights} from '../src/lib/report-insights';
+import type {ReportRow} from '../src/lib/meta-csv-report';
+const row=(x:Partial<ReportRow>={}):ReportRow=>({accountId:'1',campaignId:'1',adsetId:'1',adId:'1',account:'A',campaign:'MESS',adset:'S',ad:'ad',age:'18-24',gender:'F',currency:'VND',spend:100,impressions:100,clicks:3,messages:2,purchases:1,registrations:1,messagesBlank:false,purchasesBlank:false,registrationsBlank:false,start:'2026-01-01',end:'2026-01-31',...x});
+test('ranks objective only on corresponding results using totals',()=>{const a=row(),b=row({age:'25-34',spend:200,messages:1});const c=reportInsights([a,b]).campaigns[0];assert.equal(c.status,'ranked');assert.equal(c.cost,100);});
+test('missing, zero, unknown and partial campaigns cannot be ranked',()=>{const a=row(),b=row({age:'25-34',messagesBlank:true});assert.equal(reportInsights([a,b]).campaigns[0].status,'missing');assert.equal(reportInsights([row({messages:0})]).campaigns[0].status,'zero');assert.equal(reportInsights([row({campaign:'old'})]).campaigns[0].status,'unknown');assert.equal(reportInsights([a],[a,b]).campaigns[0].status,'partial');});
+test('duplicates, missing IDs and changed name outside filter are not ranked',()=>{const a=row();assert.equal(reportInsights([a,a]).campaigns[0].status,'duplicate');assert.equal(reportInsights([row({campaignId:''})]).campaigns[0].status,'id');assert.equal(reportInsights([a],[a,row({campaign:'PURCHASES',age:'25'})]).campaigns[0].status,'conflict');});
+test('audience missing values remain unknown independently',()=>{const a=row(),b=row({age:'25',messagesBlank:true,registrations:null});const data=reportInsights([a,b]);assert.equal(data.total.messagesMissing,true);assert.equal(data.total.registrationsMissing,true);assert.equal(data.age.find(x=>x.label==='18-24')?.messagesMissing,false);});

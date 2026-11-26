@@ -3,6 +3,7 @@ import {useState} from 'react';
 import Link from 'next/link';
 import {VideoReport} from '@/components/reports/VideoReport';
 import {AllReportRows} from '@/components/reports/AllReportRows';
+import {ReportInsights} from '@/components/reports/ReportInsights';
 import {VideoPeriodStorage} from '@/components/reports/VideoPeriodStorage';
 import {parseMediaCatalog,type CatalogMedia} from '@/lib/media-reconciliation';
 import {parseCsv,parseMetaReport,parseMetaRows,normalizeExcelRows,reportGroupKey,summarizeMeta} from '@/lib/meta-csv-report';
@@ -24,7 +25,7 @@ export default function ReportImportPage(){
  {mode==='configured'&&data&&data.errors.length>0&&<p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-700">Không tổng hợp khi có dòng lỗi. Kiểm tra dòng: {data.errors.slice(0,20).map(e=>e.line).join(', ')}.</p>}
  {<div className="flex flex-wrap gap-2 rounded-xl border bg-white p-2" role="group" aria-label="Chế độ báo cáo"><button type="button" onClick={()=>setMode('all')} aria-pressed={mode==='all'} className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode==='all'?'bg-indigo-700 text-white':'text-slate-600'}`}>Tất cả chỉ số</button><button type="button" onClick={()=>setMode('configured')} aria-pressed={mode==='configured'} className={`rounded-lg px-4 py-2 text-sm font-semibold ${mode==='configured'?'bg-indigo-700 text-white':'text-slate-600'}`}>Theo quy tắc đã thiết lập</button></div>}
  {mode==='all'&&raw.length>0&&<AllReportRows data={raw}/>}
- {mode==='configured'&&data&&data.errors.length===0&&<><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-slate-900">Khám phá báo cáo</h2><p className="text-xs text-slate-500">Lọc theo tài khoản, campaign, nhóm hoặc tên quảng cáo.</p></div><input aria-label="Lọc báo cáo" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Tìm campaign, video…" className="w-full rounded-lg border bg-white px-4 py-2 text-sm sm:w-80"/></div><VideoReport rows={filtered} referenceRows={rows} catalog={catalog}/></>}
+ {data&&data.errors.length===0&&<><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold text-slate-900">Đánh giá & insight</h2><p className="text-xs text-slate-500">Lọc theo tài khoản, campaign, nhóm hoặc tên quảng cáo. Bộ lọc dữ liệu gốc ở bảng riêng phía trên.</p></div><input aria-label="Lọc báo cáo" value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Tìm campaign, video…" className="w-full rounded-lg border bg-white px-4 py-2 text-sm sm:w-80"/></div><ReportInsights rows={filtered} referenceRows={rows} allowRank={data.differences.length===0}/>{mode==='configured'&&<VideoReport rows={filtered} referenceRows={rows} catalog={catalog}/>}</>}
  {mode==='configured'&&<VideoPeriodStorage key={JSON.stringify([selected,rows.length,rows[0]?.start,rows[0]?.end])} data={data&&data.errors.length===0?raw:[]}/>}
  <p className="text-xs text-slate-500">Tên quảng cáo cần có dạng SP_M001_VID và file cần ID quảng cáo. Không cộng người tiếp cận; không suy ra doanh thu hoặc lợi nhuận. Việc khớp theo tên không xác minh creative thực tế trên Meta.</p></main>;
 }
