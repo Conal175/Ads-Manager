@@ -1,0 +1,7 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildVideoReport} from '../src/lib/video-report';
+import type {ReportRow} from '../src/lib/meta-csv-report';
+const row=(overrides:Partial<ReportRow>={}):ReportRow=>({accountId:'a',campaignId:'c',adsetId:'s',adId:'1',account:'A',campaign:'MESS',adset:'S',ad:'GI_M001_VID',age:'',gender:'',currency:'VND',spend:100,impressions:50,clicks:3,messages:2,purchases:1,registrations:null,messagesBlank:false,purchasesBlank:false,registrationsBlank:true,start:'2026-01-01',end:'2026-01-01',...overrides});
+test('aggregates identified videos and marks missing registrations',()=>{const result=buildVideoReport([row(),row({age:'35-44',spend:50,messages:1,registrations:2,registrationsBlank:false}),row({adId:'2',ad:'GI_M002_IMG'}),row({adId:'3',ad:'M001_VID_old'}),row({adId:'',ad:'GI_M002_VID'})]); assert.equal(result.skippedRows,3); assert.equal(result.videos.length,1); assert.equal(result.videos[0].spend,150); assert.equal(result.videos[0].messages,3); assert.equal(result.videos[0].registrations,2); assert.equal(result.videos[0].registrationsBlank,true);});
+test('rejects conflicting names and IDs even when the conflicting group is filtered out',()=>{const a=row(), b=row({ad:'GI_M002_VID'}); assert.equal(buildVideoReport([a],[a,b]).videos.length,0); const other=row({campaignId:'other'}); assert.equal(buildVideoReport([a],[a,other]).videos.length,0);});
