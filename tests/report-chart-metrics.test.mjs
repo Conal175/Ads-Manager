@@ -11,3 +11,16 @@ test('rates use totals and undefined denominators are not zero-cost results',()=
  assert.equal(chartMetricValue(empty,'costPerMessage'),null);
  assert.equal(chartMetricValue(empty,'costPerPurchase'),null);
 });
+
+test('efficiency ranking favors lower cost or higher CTR, and leaves missing outcomes unranked',async()=>{
+ const {rankByEfficiency}=await import('../src/lib/report-chart-metrics.ts');
+ const base={impressions:100,clicks:10,purchases:0};
+ const items=[{...base,label:'expensive',spend:1000,messages:2},{...base,label:'efficient',spend:300,messages:3},{...base,label:'no results',spend:500,messages:0},{...base,label:'zero cost',spend:0,messages:2}];
+ const r=rankByEfficiency(items,'costPerMessage');
+ assert.deepEqual(r.ranked.map(x=>x.entry.label),['zero cost','efficient','expensive']);
+ assert.deepEqual(r.unranked.map(x=>x.entry.label),['no results']);
+ assert.equal(rankByEfficiency(items,'costPerPurchase').ranked.length,0);
+ const ctr=rankByEfficiency([{...items[0],label:'low',clicks:1},{...items[1],label:'high',clicks:20},{...items[2],label:'undefined',impressions:0}],'ctr');
+ assert.deepEqual(ctr.ranked.map(x=>x.entry.label),['high','low']);
+ assert.equal(ctr.unranked[0].entry.label,'undefined');
+});
