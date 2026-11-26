@@ -4,55 +4,15 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { canViewPage, type AppRole } from "@/lib/auth/policy";
-import {
-  LayoutDashboard,
-  Settings2,
-  Package,
-  Film,
-  Rocket,
-  BarChart3,
-  Zap,
-  Menu,
-  X,
-} from "lucide-react";
+import { LayoutDashboard, Settings2, Package, Film, Rocket, BarChart3, Zap, Menu, X, ArrowUpRight, Layers3 } from "lucide-react";
 
 const NAV_ITEMS = [
-  {
-    href: "/",
-    label: "Tổng quan & AI Briefing",
-    shortDesc: "Bản tin 07:30 & Pacing",
-    icon: LayoutDashboard,
-  },
-  {
-    href: "/products",
-    label: "Sản phẩm & KPI Tài chính",
-    shortDesc: "CPO, Versioning, Pacing",
-    icon: Package,
-  },
-  {
-    href: "/creatives",
-    label: "Kho Creative & Post ID",
-    shortDesc: "Drive Metadata & Cache",
-    icon: Film,
-  },
-  {
-    href: "/launcher",
-    label: "Trình Lên Ads (3 Luồng)",
-    shortDesc: "Đẩy PAUSED & Auto-Name",
-    icon: Rocket,
-  },
-  {
-    href: "/reports",
-    label: "Báo cáo & Lợi nhuận thực",
-    shortDesc: "3 cấp, Heatmap, Sheets",
-    icon: BarChart3,
-  },
-  {
-    href: "/actions",
-    label: "Trung tâm Đề xuất",
-    shortDesc: "Kill, Scale, Fatigue, Leak",
-    icon: Zap,
-  },
+  { href: "/", label: "Tổng quan", shortDesc: "Dashboard & briefing", icon: LayoutDashboard },
+  { href: "/products", label: "Sản phẩm & KPI", shortDesc: "Theo dõi hiệu quả", icon: Package },
+  { href: "/creatives", label: "Kho nội dung", shortDesc: "Media & Post ID", icon: Film },
+  { href: "/reports", label: "Báo cáo", shortDesc: "Phân tích & đối soát", icon: BarChart3 },
+  { href: "/actions", label: "Đề xuất", shortDesc: "Các cơ hội cần xem", icon: Zap },
+  { href: "/launcher", label: "Lên quảng cáo", shortDesc: "Bản nháp & thiết lập", icon: Rocket },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -64,118 +24,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     fetch("/api/auth/me", { cache: "no-store" }).then(res => res.ok ? res.json() : null).then(data => { if (active) setRole(data?.role ?? null); }).catch(() => { if (active) setRole(null); });
     return () => { active = false; };
   }, [pathname]);
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen]);
 
   if (pathname === "/login" || pathname === "/register" || pathname === "/no-access" || pathname.startsWith("/auth/")) return <>{children}</>;
+  const current = NAV_ITEMS.find(item => item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
+  const section = current?.label ?? (pathname.startsWith('/assets') || pathname.startsWith('/system') || pathname.startsWith('/users') ? 'Cài đặt & kết nối' : 'Không gian làm việc');
 
-  return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-[#f5f7fc]">
-      {/* Mobile Top Bar */}
-      <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-14 bg-white border-b border-slate-200">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            AP
-          </div>
-          <div>
-            <div className="text-sm font-bold text-slate-900 leading-tight">
-              AdsPulse OS
-            </div>
-            <div className="text-[11px] text-slate-500">Meta Ads & Lợi nhuận thực</div>
-          </div>
-        </Link>
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
-          aria-label="Mở menu điều hướng"
-        >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </header>
-
-      {/* Mobile Drawer Backdrop */}
-      {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-slate-900/40"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-[256px] shrink-0 bg-white border-r border-slate-200/80 flex flex-col transition-transform duration-200 ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
-      >
-        <div className="h-16 px-4 flex items-center gap-3 border-b border-slate-100">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-            AP
-          </div>
-          <div className="min-w-0">
-            <div className="text-[15px] font-bold text-slate-900 tracking-tight truncate">
-              AdsPulse OS
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 truncate">
-              Meta Ads Ops & Profit Hub
-            </div>
-          </div>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto px-3 py-5 space-y-1">
-          {NAV_ITEMS.filter((item) => canViewPage(role, item.href)).map((item) => {
-            const Icon = item.icon;
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  active
-                    ? "bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent"
-                }`}
-              >
-                <Icon
-                  className={`w-[18px] h-[18px] shrink-0 ${
-                    active
-                      ? "text-blue-600"
-                      : "text-slate-400 group-hover:text-slate-600"
-                  }`}
-                />
-                <div className="min-w-0">
-                  <div className="text-[13px] leading-tight truncate">
-                    {item.label}
-                  </div>
-                  <div
-                    className={`text-[11px] truncate mt-0.5 ${
-                      active ? "text-blue-600/80 font-normal" : "text-slate-400"
-                    }`}
-                  >
-                    {item.shortDesc}
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="p-3 border-t border-slate-100">
-          {canViewPage(role, "/assets") && <Link href="/assets" onClick={() => setMobileOpen(false)} className={`flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors ${pathname.startsWith("/assets") || pathname.startsWith("/system") || pathname.startsWith("/users") ? "border-indigo-100 bg-indigo-50 text-indigo-700" : "border-transparent text-slate-600 hover:bg-slate-50"}`}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700"><Settings2 className="h-[18px] w-[18px]" /></span>
-            <span className="min-w-0"><span className="block text-[13px] font-semibold">Cài đặt và kết nối</span><span className="block text-[11px] text-slate-500">Tài khoản, Meta & hệ thống</span></span>
-          </Link>}
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="app-content flex-1 min-w-0">
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {children}
-        </div>
-      </main>
-    </div>
-  );
+  return <div className="min-h-screen flex flex-col lg:flex-row bg-[#f4f6fa]">
+    <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-16 bg-white/95 backdrop-blur border-b border-slate-200">
+      <Link href="/" className="flex items-center gap-2.5"><span className="brand-mark"><Layers3 size={19}/></span><span><span className="block text-sm font-bold tracking-tight text-slate-900">Ads Manager</span><span className="block text-[10px] font-medium text-slate-500">KHÔNG GIAN ĐIỀU HÀNH</span></span></Link>
+      <button type="button" onClick={() => setMobileOpen(!mobileOpen)} className="rounded-xl p-2.5 text-slate-700 hover:bg-slate-100" aria-expanded={mobileOpen} aria-controls="app-navigation" aria-label={mobileOpen ? "Đóng menu điều hướng" : "Mở menu điều hướng"}>{mobileOpen ? <X size={20}/> : <Menu size={20}/>}</button>
+    </header>
+    {mobileOpen && <button type="button" aria-label="Đóng menu điều hướng" className="lg:hidden fixed inset-0 z-30 bg-slate-950/50" onClick={() => setMobileOpen(false)}/>}
+    <aside id="app-navigation" className={`app-sidebar fixed lg:sticky top-0 left-0 z-40 h-screen w-[264px] shrink-0 flex flex-col transition-transform duration-200 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      <div className="flex h-[88px] items-center gap-3 px-6"><span className="brand-mark"><Layers3 size={20}/></span><span><span className="block text-[16px] font-bold tracking-tight text-white">Ads Manager<span className="text-indigo-300">.</span></span><span className="mt-0.5 block text-[10px] font-semibold tracking-[.16em] text-slate-400">KHÔNG GIAN ĐIỀU HÀNH</span></span></div>
+      <div className="px-6 pt-4 pb-2 text-[10px] font-bold tracking-[.16em] text-slate-500">KHÔNG GIAN LÀM VIỆC</div>
+      <nav aria-label="Điều hướng chính" className="flex-1 overflow-y-auto px-3 py-2 space-y-1.5">
+        {NAV_ITEMS.filter(item => canViewPage(role, item.href)).map(item => { const Icon=item.icon; const active=item.href === '/' ? pathname === '/' : pathname.startsWith(item.href); return <Link key={item.href} href={item.href} aria-current={active?'page':undefined} onClick={()=>setMobileOpen(false)} className={`nav-entry ${active?'nav-entry-active':''}`}><span className="nav-icon"><Icon size={18}/></span><span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold leading-tight">{item.label}</span><span className="mt-1 block text-[11px] leading-tight text-slate-400">{item.shortDesc}</span></span>{active&&<span className="h-1.5 w-1.5 rounded-full bg-indigo-300"/>}</Link>; })}
+      </nav>
+      <div className="border-t border-white/10 p-3">{canViewPage(role, '/assets')&&<Link href="/assets" onClick={()=>setMobileOpen(false)} className={`nav-entry ${pathname.startsWith('/assets')||pathname.startsWith('/system')||pathname.startsWith('/users')?'nav-entry-active':''}`}><span className="nav-icon"><Settings2 size={18}/></span><span className="min-w-0 flex-1"><span className="block text-[13px] font-semibold">Cài đặt & kết nối</span><span className="mt-1 block text-[11px] text-slate-400">Tài khoản & hệ thống</span></span><ArrowUpRight size={15} className="text-slate-500"/></Link>}</div>
+    </aside>
+    <main className="app-content flex-1 min-w-0"><div className="workspace-bar hidden lg:flex"><div className="flex items-center gap-2"><span className="text-slate-400">Không gian làm việc</span><span className="text-slate-300">/</span><span className="font-semibold text-slate-700">{section}</span></div><span className="workspace-tag"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400"/> ADS MANAGER</span></div><div className="max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-9 py-7 lg:py-9">{children}</div></main>
+  </div>;
 }
