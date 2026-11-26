@@ -1,5 +1,5 @@
 /** Meta report preview. This module deliberately never persists imported data. */
-export type ReportRow = { accountId:string; campaignId:string; adsetId:string; adId:string; account:string; campaign:string; adset:string; ad:string; age:string; gender:string; currency:string; spend:number; impressions:number; clicks:number; messages:number; purchases:number; registrations:number|null; messagesBlank:boolean; purchasesBlank:boolean; registrationsBlank:boolean; start:string; end:string };
+export type ReportRow = { deliveryStatus?:string; accountId:string; campaignId:string; adsetId:string; adId:string; account:string; campaign:string; adset:string; ad:string; age:string; gender:string; currency:string; spend:number; impressions:number; clicks:number; messages:number; purchases:number; registrations:number|null; messagesBlank:boolean; purchasesBlank:boolean; registrationsBlank:boolean; start:string; end:string };
 export function parseCsv(text:string): string[][] {
   const rows:string[][]=[]; let row:string[]=[], cell='', quoted=false;
   text=text.replace(/^\uFEFF/,'');
@@ -59,7 +59,7 @@ export function parseMetaRows(data:string[][]) {
     const registrations=registrationIndex<0?null:numberValue(registrationText,true);
     const start=get('start'),end=get('end');
     if(!get('account')||!get('campaign')||!get('adset')||!get('ad')||get('currency')!=='VND'||spend===null||impressions===null||clicks===null||messages===null||purchases===null||(registrationIndex>=0&&(registrations===null||!Number.isSafeInteger(registrations)))||![impressions,clicks,messages,purchases].every(Number.isSafeInteger)||!validDate(start)||!validDate(end)||start>end){errors.push({line:i+2,message:'Thiếu định danh, sai số, tiền tệ hoặc kỳ báo cáo.'});return;}
-    rows.push({...ids,account:get('account'),campaign:get('campaign'),adset:get('adset'),ad:get('ad'),age:get('age'),gender:get('gender'),currency:'VND',spend,impressions,clicks,messages,purchases,registrations,messagesBlank:!get('messages'),purchasesBlank:!get('purchases'),registrationsBlank:!registrationText,start,end});
+    rows.push({...ids,deliveryStatus:(r[headers.indexOf('Phân phối quảng cáo')]??'').trim(),account:get('account'),campaign:get('campaign'),adset:get('adset'),ad:get('ad'),age:get('age'),gender:get('gender'),currency:'VND',spend,impressions,clicks,messages,purchases,registrations,messagesBlank:!get('messages'),purchasesBlank:!get('purchases'),registrationsBlank:!registrationText,start,end});
   });
   const periods=new Set(rows.map(r=>`${r.start}/${r.end}`));
   if(periods.size>1) throw new Error('File có nhiều kỳ báo cáo; không cộng các kỳ có thể chồng lấn.');

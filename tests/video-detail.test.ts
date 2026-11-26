@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {buildDetailedVideoReport} from '../src/lib/video-report';
+import type {ReportRow} from '../src/lib/meta-csv-report';
+const row=(x:Partial<ReportRow>={}):ReportRow=>({accountId:'1',campaignId:'1',adsetId:'1',adId:'1',account:'A',campaign:'MESS',adset:'S',ad:'GI_M001_VID',age:'18',gender:'F',currency:'VND',spend:100,impressions:100,clicks:2,messages:2,purchases:0,registrations:0,messagesBlank:false,purchasesBlank:false,registrationsBlank:false,start:'2026-01-01',end:'2026-01-31',...x});
+const catalog=[{code:'M001',productCode:'GI',productName:'Gi',type:'video',fileName:'a.mp4'}];
+test('separates objectives and calculates cost from sums',()=>{const rows=[row(),row({adId:'2',campaignId:'2',campaign:'PURCHASES',spend:60,purchases:3}),row({adId:'3',campaignId:'3',campaign:'CONVERSION',spend:40,registrations:1})];const v=buildDetailedVideoReport(rows,rows,catalog).videos[0];assert.deepEqual(v.objectives.map(o=>o.cost),[50,20,40]);assert.equal(v.details.length,3);});
+test('missing result never produces a cost',()=>{const rows=[row(),row({age:'25',messagesBlank:true,messages:0})];const v=buildDetailedVideoReport(rows,rows,catalog).videos[0];assert.equal(v.objectives[0].missing,true);assert.equal(v.objectives[0].cost,null);});
+test('rejects ambiguous catalog and duplicate partitions even outside filter',()=>{const r=row(),duplicate=row({spend:200});assert.equal(buildDetailedVideoReport([r],[r,duplicate],catalog).videos.length,0);assert.equal(buildDetailedVideoReport([r],[r],[...catalog,{...catalog[0],type:'image'}]).videos.length,0);});
+test('campaign name conflicts and unknown objective are not evaluated',()=>{const a=row(),b=row({adId:'2',campaign:'PURCHASES'});const result=buildDetailedVideoReport([a],[a,b],catalog);assert.equal(result.videos[0].details[0].objective,'conflict');assert.equal(result.videos[0].objectives[0].count,0);});
