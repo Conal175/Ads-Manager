@@ -26,6 +26,8 @@ export default function CreativesHubPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [previewingDrive, setPreviewingDrive] = useState(false);
+  const [drivePreview, setDrivePreview] = useState<{files: Array<{id:string; name:string; productCode:string; month:string; mimeType:string; status:string}>; warnings:string[]; counts:Record<string, number>} | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
 
   const [filterProduct, setFilterProduct] = useState("ALL");
@@ -110,6 +112,18 @@ export default function CreativesHubPage() {
     } finally {
       setSyncing(false);
     }
+  };
+
+  const driveStatusLabel: Record<string, string> = {new:"Mới", existing:"Đã có", unknown_product:"Chưa có sản phẩm", product_conflict:"Khác sản phẩm đã lưu", duplicate_file:"Trùng ID file", ambiguous_product:"Mã sản phẩm không duy nhất"};
+  const handlePreviewDrive = async () => {
+    setPreviewingDrive(true); setBanner(null); setDrivePreview(null);
+    try {
+      const res = await fetch("/api/creatives", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"preview_drive"})});
+      const json = await res.json();
+      if (!res.ok) setBanner(json.error || "Không thể xem trước Drive.");
+      else { setDrivePreview(json); setBanner(json.message); }
+    } catch { setBanner("Không thể kết nối để xem trước Drive."); }
+    finally { setPreviewingDrive(false); }
   };
 
   const handleLifecycleChange = async (
@@ -214,6 +228,10 @@ export default function CreativesHubPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
             Xuất danh mục CSV
           </a>
+          <button onClick={handlePreviewDrive} disabled={previewingDrive}
+            className="inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            {previewingDrive ? "Đang đọc Drive..." : "Xem trước Drive"}
+          </button>
           <button
             onClick={handleSyncDrive}
             disabled={syncing}
@@ -226,6 +244,14 @@ export default function CreativesHubPage() {
       </div>
 
       <FeedbackBanner message={banner} onClose={() => setBanner(null)} />
+      {drivePreview && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
+        <div className="flex justify-between gap-3"><h2 className="font-semibold">Xem trước Drive: {drivePreview.files.length} file — chưa nhập dữ liệu</h2><button onClick={() => setDrivePreview(null)} className="text-blue-700">Đóng</button></div>
+        <p className="mt-2 text-slate-500">Chỉ hiển thị 100 file đầu. Ảnh và video theo cấu trúc mã sản phẩm/tháng; không thay đổi file hoặc cơ sở dữ liệu.</p>
+        <p className="mt-2 text-slate-600">{Object.entries(drivePreview.counts).map(([status,count]) => `${driveStatusLabel[status] ?? status}: ${count}`).join(" · ")}</p>
+        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.slice(0, 100).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all">{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}</li>)}</ul>
+        {drivePreview.warnings.length > 0 && <details className="mt-3 text-amber-700"><summary>{drivePreview.warnings.length} mục bị bỏ qua</summary><ul className="max-h-40 overflow-auto">{drivePreview.warnings.slice(0,100).map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
+      </section>}
+
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

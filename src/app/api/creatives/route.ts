@@ -1,5 +1,5 @@
 import { authorizeApi } from "@/lib/auth/server";
-import { isDemoMode, demoOnlyError } from "@/lib/api-utils";
+import { isDemoMode, demoOnlyError, resolveEffectiveSecrets } from "@/lib/api-utils";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
+import { previewDriveInventory } from "@/services/drive-inventory";
+import { matchDriveInventory } from "@/lib/drive-inventory";
 
 export async function GET() {
   const denied = await authorizeApi("operator");
@@ -50,8 +52,26 @@ export async function POST(req: NextRequest) {
   const denied = await authorizeApi("operator", true);
   if (denied) return denied;
   try {
-    await ensureSeeded();
     const body = await req.json();
+
+    if (body.action === "preview_drive") {
+      const [settings] = await db.select().from(systemSettings).limit(1);
+      const secrets = resolveEffectiveSecrets(settings);
+      if (!secrets.googleDriveRootFolderId || !secrets.googleServiceAccountJson) return NextResponse.json({error:"Chưa cấu hình thư mục Drive hoặc Service Account."}, {status:400});
+      try {
+        const [preview, productRows, creativeRows] = await Promise.all([
+          previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId),
+          db.select({ id: products.id, code: products.code }).from(products),
+          db.select({ id: creatives.id, productId: creatives.productId, driveFileId: creatives.driveFileId }).from(creatives),
+        ]);
+        const matched = matchDriveInventory(preview.files, productRows, creativeRows);
+        return NextResponse.json({...matched, warnings:preview.warnings, message:"Chỉ xem trước metadata, chưa nhập hay thay đổi dữ liệu."}, {headers:{"Cache-Control":"private, no-store"}});
+      } catch {
+        return NextResponse.json({error:"Không thể đọc đầy đủ thư mục Drive. Kiểm tra quyền, cấu trúc, giới hạn quét và cấu hình Google."}, {status:502});
+      }
+    }
+
+    await ensureSeeded();
 
     if (body.action === "sync_drive") {
     if (!isDemoMode()) return demoOnlyError();
