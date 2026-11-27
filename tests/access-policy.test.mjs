@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { canUseRole, canViewPage } from "../src/lib/auth/policy.ts";
 
-const allowed = ["/assets", "/products", "/creatives", "/launcher", "/actions"];
+const allowed = ["/ad-accounts", "/assets", "/products", "/creatives", "/launcher", "/actions"];
 const restricted = ["/", "/users", "/reports", "/system", "/unknown", "/assets-elsewhere"];
 test("operator can access exactly the assigned page sections", () => {
   for (const path of allowed) { assert.equal(canViewPage("operator", path), true); assert.equal(canViewPage("operator", `${path}/child`), true); }

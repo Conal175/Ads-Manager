@@ -1,5 +1,5 @@
 export type AppRole = "viewer" | "operator" | "admin";
-export const operatorPages = ["/assets", "/products", "/creatives", "/launcher", "/actions"] as const;
+export const operatorPages = ["/assets", "/ad-accounts", "/products", "/creatives", "/launcher", "/actions"] as const;
 export function canViewPage(role: AppRole | null, pathname: string): boolean {
   if (role === "admin") return true;
   return role === "operator" && operatorPages.some((path) => pathname === path || pathname.startsWith(path + "/"));

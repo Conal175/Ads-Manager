@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Tổng quan", shortDesc: "Dashboard & briefing", icon: LayoutDashboard },
   { href: "/products", label: "Sản phẩm & KPI", shortDesc: "Theo dõi hiệu quả", icon: Package },
   { href: "/creatives", label: "Kho nội dung", shortDesc: "Media & Post ID", icon: Film },
+  { href: "/ad-accounts", label: "Tài khoản quảng cáo", shortDesc: "Tài khoản & chiến dịch", icon: BarChart3 },
   { href: "/pages", label: "Quản lý Trang", shortDesc: "Fanpage & bài viết", icon: PanelsTopLeft },
   { href: "/reports", label: "Báo cáo", shortDesc: "Phân tích & đối soát", icon: BarChart3 },
   { href: "/actions", label: "Đề xuất", shortDesc: "Các cơ hội cần xem", icon: Zap },
