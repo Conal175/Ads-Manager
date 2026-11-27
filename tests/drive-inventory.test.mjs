@@ -47,8 +47,14 @@ test('scoped inventory scans only the chosen folder and rejects folders outside 
  await assert.rejects(collectDriveInventory('root',list,{productId:'p',folderId:'x'}),/Selected folder/);
  await assert.rejects(collectDriveInventory('root',list,{productId:'missing',folderId:'m'}),/Selected product/);
 });
-test('explicitly selected arbitrary direct folder is scanned, without scanning siblings or nested folders',async()=>{
- const tree={root:[{id:'p',name:'Gi',mimeType:folder}],p:[{id:'feedback',name:'Feedback',mimeType:folder},{id:'m',name:'2026-11',mimeType:folder}],feedback:[{id:'video',name:'M171.mp4',mimeType:'video/mp4'},{id:'nested',name:'child',mimeType:folder}]};
+test('explicitly selected folder recursively scans descendants, without scanning siblings or shortcuts',async()=>{
+ const tree={root:[{id:'p',name:'Gi',mimeType:folder}],p:[{id:'feedback',name:'Feedback',mimeType:folder},{id:'m',name:'2026-11',mimeType:folder}],feedback:[{id:'video',name:'M171.mp4',mimeType:'video/mp4'},{id:'nested',name:'child',mimeType:folder},{id:'link',name:'shortcut',mimeType:'application/vnd.google-apps.shortcut'}],nested:[{id:'deep',name:'deep',mimeType:folder}],deep:[{id:'image',name:'M172.png',mimeType:'image/png'}]};
  const calls=[]; const result=await collectDriveInventory('root',async id=>{calls.push(id);return tree[id]}, {productId:'p',folderId:'feedback'});
- assert.deepEqual(calls,['root','p','feedback']);assert.equal(result.files[0].path,'Gi/Feedback');assert.equal(result.files[0].month,'Feedback');assert.equal(result.files.length,1);
+ assert.deepEqual(calls,['root','p','feedback','nested','deep']);assert.equal(result.files[0].path,'Gi/Feedback');assert.equal(result.files[1].path,'Gi/Feedback/child/deep');assert.equal(result.files[1].month,'Feedback');assert.equal(result.files.length,2);
+});
+
+test('recursive scan fails on cycles and bounded folder limit',async()=>{
+ const base={root:[{id:'p',name:'Gi',mimeType:folder}],p:[{id:'f',name:'Feedback',mimeType:folder}]};
+ await assert.rejects(collectDriveInventory('root',async id=>base[id] ?? [{id:'f',name:'cycle',mimeType:folder}],{productId:'p',folderId:'f'}),/Repeated folder/);
+ await assert.rejects(collectDriveInventory('root',async id=>base[id] ?? [{id:id+'x',name:'nested',mimeType:folder}],{productId:'p',folderId:'f'}),/limit/i);
 });

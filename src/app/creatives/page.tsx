@@ -250,7 +250,7 @@ export default function CreativesHubPage() {
       <FeedbackBanner message={banner} onClose={() => setBanner(null)} />
       {folderPicker && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
         <div className="flex justify-between gap-3"><h2 className="font-semibold">Chọn thư mục cần quét</h2><button type="button" onClick={() => setFolderPicker(false)} className="text-blue-700">Đóng</button></div>
-        <p className="text-slate-500">Chọn sản phẩm và thư mục con trực tiếp. Chỉ quét media nằm trực tiếp trong thư mục đã chọn, không quét thư mục lồng bên trong.</p>
+        <p className="text-slate-500">Chọn sản phẩm và thư mục con trực tiếp. Quét media trong thư mục đã chọn và tất cả thư mục lồng bên trong.</p>
         <div className="flex flex-wrap gap-2">
           <select aria-label="Thư mục sản phẩm Drive" disabled={folderLoading || previewingDrive || importingDrive} value={driveProductFolder} onChange={e => { const id=e.target.value; setDriveProductFolder(id); setDriveFolder(""); setSubFolders([]); setDrivePreview(null); setSelectedDriveIds([]); if (id) void loadFolders(id); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Chọn sản phẩm</option>{productFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
           <select aria-label="Thư mục con Drive" disabled={!driveProductFolder || folderLoading || previewingDrive || importingDrive} value={driveFolder} onChange={e => {setDriveFolder(e.target.value); setDrivePreview(null); setSelectedDriveIds([]);}} className="rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Chọn thư mục</option>{subFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>

@@ -35,10 +35,21 @@ export async function collectDriveInventory(rootId: string, listChildren: (id: s
       // Explicit selection permits any direct subfolder; unscoped scans retain the existing restrictions.
       const normalizedMonth = normalizeMonthFolder(month.name) ?? ((scope || (code === 'GI' && month.name.trim().toUpperCase() === 'ADS WIN')) ? month.name.trim() : null);
       if (month.mimeType !== folderType || !normalizedMonth) { warnings.push(`Bỏ qua mục không phải thư mục tháng: ${product.name}/${month.name}`); continue; }
-      for (const file of await list(month.id)) {
-        if (!validId(file.id)) throw new Error('Invalid file id');
-        if (!file.mimeType.startsWith('image/') && !file.mimeType.startsWith('video/')) { warnings.push(`Bỏ qua file không phải ảnh/video: ${file.name}`); continue; }
-        files.push({id:file.id, name:file.name, mimeType:file.mimeType, sizeBytes:file.size ?? null, modifiedTime:file.modifiedTime ?? null, durationMillis:file.videoMediaMetadata?.durationMillis ?? null, productCode:code, month:normalizedMonth, path:`${product.name}/${month.name}`});
+      const pending = [{id: month.id, path: `${product.name}/${month.name}`}];
+      const visited = new Set<string>();
+      while (pending.length) {
+        const current = pending.pop()!;
+        if (visited.has(current.id)) throw new Error('Repeated folder in inventory');
+        visited.add(current.id);
+        for (const file of await list(current.id)) {
+          if (!validId(file.id)) throw new Error('Invalid file id');
+          if (scope && file.mimeType === folderType) {
+            pending.push({id: file.id, path: `${current.path}/${file.name}`});
+            continue;
+          }
+          if (!file.mimeType.startsWith('image/') && !file.mimeType.startsWith('video/')) { warnings.push(`Bỏ qua file không phải ảnh/video: ${file.name}`); continue; }
+          files.push({id:file.id, name:file.name, mimeType:file.mimeType, sizeBytes:file.size ?? null, modifiedTime:file.modifiedTime ?? null, durationMillis:file.videoMediaMetadata?.durationMillis ?? null, productCode:code, month:normalizedMonth, path:current.path});
+        }
       }
     }
   }
