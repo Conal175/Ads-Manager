@@ -48,7 +48,7 @@ export async function PUT(req: NextRequest) {
     };
 
     if (typeof body.metaSystemUserToken === "string" && body.metaSystemUserToken.trim() !== "")
-      updateData.metaSystemUserToken = body.metaSystemUserToken.trim();
+      return jsonError("Không lưu token Meta qua biểu mẫu. Dùng biến môi trường bảo mật.", 400);
     if (typeof body.metaBusinessManagerId === "string")
       updateData.metaBusinessManagerId = body.metaBusinessManagerId.trim();
     if (typeof body.googleDriveRootFolderId === "string")
