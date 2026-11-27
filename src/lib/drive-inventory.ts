@@ -1,6 +1,10 @@
 export type DriveEntry = { id: string; name: string; mimeType: string; size?: string; modifiedTime?: string; videoMediaMetadata?: { durationMillis?: string } };
 export type DriveMediaPreview = { id: string; name: string; mimeType: string; sizeBytes: string | null; modifiedTime: string | null; durationMillis: string | null; productCode: string; month: string; path: string };
 const folderType = 'application/vnd.google-apps.folder';
+export function normalizeMonthFolder(name: string): string | null {
+  const match = /^(\d{4})\s*-\s*(0?[1-9]|1[0-2])$/.exec(name.trim());
+  return match ? `${match[1]}-${match[2].padStart(2, '0')}` : null;
+}
 const validId = (id: string) => /^[a-zA-Z0-9_-]+$/.test(id);
 /** Strictly bounded inventory. Does not follow shortcuts or modify files. */
 export async function collectDriveInventory(rootId: string, listChildren: (id: string) => Promise<DriveEntry[]>) {
@@ -23,11 +27,12 @@ export async function collectDriveInventory(rootId: string, listChildren: (id: s
     if (!code || names.has(code)) throw new Error('Duplicate product folder');
     names.add(code);
     for (const month of await list(product.id)) {
-      if (month.mimeType !== folderType || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month.name)) { warnings.push(`Bỏ qua mục không phải thư mục tháng: ${product.name}/${month.name}`); continue; }
+      const normalizedMonth = normalizeMonthFolder(month.name);
+      if (month.mimeType !== folderType || !normalizedMonth) { warnings.push(`Bỏ qua mục không phải thư mục tháng: ${product.name}/${month.name}`); continue; }
       for (const file of await list(month.id)) {
         if (!validId(file.id)) throw new Error('Invalid file id');
         if (!file.mimeType.startsWith('image/') && !file.mimeType.startsWith('video/')) { warnings.push(`Bỏ qua file không phải ảnh/video: ${file.name}`); continue; }
-        files.push({id:file.id, name:file.name, mimeType:file.mimeType, sizeBytes:file.size ?? null, modifiedTime:file.modifiedTime ?? null, durationMillis:file.videoMediaMetadata?.durationMillis ?? null, productCode:code, month:month.name, path:`${product.name}/${month.name}`});
+        files.push({id:file.id, name:file.name, mimeType:file.mimeType, sizeBytes:file.size ?? null, modifiedTime:file.modifiedTime ?? null, durationMillis:file.videoMediaMetadata?.durationMillis ?? null, productCode:code, month:normalizedMonth, path:`${product.name}/${month.name}`});
       }
     }
   }

@@ -24,3 +24,9 @@ test('classify existing, new, unknown and conflicting media without writing', as
  assert.deepEqual(result.files.map(x=>x.status),['new','existing','unknown_product','product_conflict','duplicate_file','duplicate_file','ambiguous_product','duplicate_file']);
  assert.deepEqual(result.counts,{new:1,existing:1,unknown_product:1,product_conflict:1,duplicate_file:3,ambiguous_product:1});
 });
+test('accept spaced and single-digit month folders, keep original path and ignore non-month folders',async()=>{
+ const {normalizeMonthFolder}=await import('../src/lib/drive-inventory.ts');
+ assert.equal(normalizeMonthFolder('2026 - 8'),'2026-08');assert.equal(normalizeMonthFolder('2026 -10'),'2026-10');assert.equal(normalizeMonthFolder('2026 - 11'),'2026-11');assert.equal(normalizeMonthFolder('2026-13'),null);assert.equal(normalizeMonthFolder('ADS Win'),null);
+ const tree={root:[{id:'p',name:'Gi',mimeType:folder}],p:[{id:'m',name:'2026 - 8',mimeType:folder}],m:[{id:'v',name:'M019_1.mp4',mimeType:'video/mp4'}]};
+ const result=await collectDriveInventory('root',async id=>tree[id]);assert.equal(result.files[0].month,'2026-08');assert.equal(result.files[0].path,'Gi/2026 - 8');
+});

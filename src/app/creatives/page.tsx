@@ -28,6 +28,7 @@ export default function CreativesHubPage() {
   const [previewingDrive, setPreviewingDrive] = useState(false);
   const [drivePreview, setDrivePreview] = useState<{files: Array<DriveSelection & {status:string}>; warnings:string[]; counts:Record<string, number>} | null>(null);
   const [selectedDriveIds, setSelectedDriveIds] = useState<string[]>([]);
+  const [drivePage, setDrivePage] = useState(0);
   const [importingDrive, setImportingDrive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
@@ -94,7 +95,7 @@ export default function CreativesHubPage() {
 
   const driveStatusLabel: Record<string, string> = {new:"Mới", existing:"Đã có", unknown_product:"Chưa có sản phẩm", product_conflict:"Khác sản phẩm đã lưu", duplicate_file:"Trùng ID file", ambiguous_product:"Mã sản phẩm không duy nhất"};
   const handlePreviewDrive = async () => {
-    setPreviewingDrive(true); setBanner(null); setDrivePreview(null); setSelectedDriveIds([]);
+    setPreviewingDrive(true); setBanner(null); setDrivePreview(null); setSelectedDriveIds([]); setDrivePage(0);
     try {
       const res = await fetch("/api/creatives", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"preview_drive"})});
       const json = await res.json();
@@ -230,9 +231,10 @@ export default function CreativesHubPage() {
       <FeedbackBanner message={banner} onClose={() => setBanner(null)} />
       {drivePreview && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <div className="flex justify-between gap-3"><h2 className="font-semibold">Xem trước Drive: {drivePreview.files.length} file — chưa nhập dữ liệu</h2><button onClick={() => setDrivePreview(null)} className="text-blue-700">Đóng</button></div>
-        <p className="mt-2 text-slate-500">Chỉ hiển thị 100 file đầu. Ảnh và video theo cấu trúc mã sản phẩm/tháng; không thay đổi file hoặc cơ sở dữ liệu.</p>
+        <p className="mt-2 text-slate-500">Ảnh và video theo cấu trúc mã sản phẩm/tháng; không thay đổi file hoặc cơ sở dữ liệu.</p>
         <p className="mt-2 text-slate-600">{Object.entries(drivePreview.counts).map(([status,count]) => `${driveStatusLabel[status] ?? status}: ${count}`).join(" · ")}</p>
-        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.slice(0, 100).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all"><label><input type="checkbox" className="mr-2" disabled={f.status !== 'new' || importingDrive || (!selectedDriveIds.includes(f.id) && selectedDriveIds.length >= 50)} checked={selectedDriveIds.includes(f.id)} onChange={e => setSelectedDriveIds(current => e.target.checked ? [...current, f.id] : current.filter(id => id !== f.id))} />{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}{f.sizeBytes && Number(f.sizeBytes) >= 80_000_000 ? ' · ≥ 80 MB' : ''}</label></li>)}</ul>
+        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.slice(drivePage * 100, (drivePage + 1) * 100).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all"><label><input type="checkbox" className="mr-2" disabled={f.status !== 'new' || importingDrive || (!selectedDriveIds.includes(f.id) && selectedDriveIds.length >= 50)} checked={selectedDriveIds.includes(f.id)} onChange={e => setSelectedDriveIds(current => e.target.checked ? [...current, f.id] : current.filter(id => id !== f.id))} />{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}{f.sizeBytes && Number(f.sizeBytes) >= 80_000_000 ? ' · ≥ 80 MB' : ''}</label></li>)}</ul>
+        <div className="mt-3 flex items-center gap-3 text-slate-600"><button type="button" className="rounded border px-3 py-1 disabled:opacity-40" disabled={drivePage===0} onClick={()=>setDrivePage(p=>p-1)}>Trước</button><span>Trang {drivePage+1}/{Math.max(1,Math.ceil(drivePreview.files.length/100))}</span><button type="button" className="rounded border px-3 py-1 disabled:opacity-40" disabled={(drivePage+1)*100>=drivePreview.files.length} onClick={()=>setDrivePage(p=>p+1)}>Sau</button></div>
         <p className="mt-3 text-slate-500">Chọn tối đa 50 file mới mỗi lần. Tên file phải bắt đầu bằng mã media duy nhất, ví dụ M001_ten.mp4. Nếu có file đổi hoặc trùng, toàn bộ lượt nhập sẽ dừng.</p>
         <button type="button" onClick={handleImportDrive} disabled={!selectedDriveIds.length || importingDrive || previewingDrive} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{importingDrive ? 'Đang nhập…' : `Nhập metadata đã chọn (${selectedDriveIds.length})`}</button>
         {drivePreview.warnings.length > 0 && <details className="mt-3 text-amber-700"><summary>{drivePreview.warnings.length} mục bị bỏ qua</summary><ul className="max-h-40 overflow-auto">{drivePreview.warnings.slice(0,100).map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
