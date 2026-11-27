@@ -6,7 +6,7 @@ export class MetaAdsError extends Error {
 }
 export function validId(id: unknown): id is string { return typeof id === 'string' && /^\d{1,30}$/.test(id); }
 export async function graphAds(token: string, version: string, path: string, params: Record<string,string>, method: 'GET'|'POST' = 'GET', fetcher: Fetcher = fetch): Promise<Record<string, unknown>> {
- if (!token.trim() || !/^v\d{2}\.0$/.test(version) || !/^(act_\d+|\d+)(\/(campaigns|insights))?$/.test(path)) throw new Error('Invalid configuration');
+ if (!token.trim() || !/^v\d{2}\.0$/.test(version) || !(path === 'me/adaccounts' && method === 'GET') && !/^(act_\d+|\d+)(\/(campaigns|insights))?$/.test(path)) throw new Error('Invalid configuration');
  const url = new URL(`https://graph.facebook.com/${version}/${path}`);
  const body = new URLSearchParams(params);
  if (method === 'GET') for (const [k,v] of body) url.searchParams.set(k,v);
@@ -22,4 +22,10 @@ export async function graphAds(token: string, version: string, path: string, par
 export function parseCampaigns(data: Record<string,unknown>) {
  if (!Array.isArray(data.data)) throw new Error('Danh sách chiến dịch không hợp lệ.');
  return {campaigns:data.data.filter((c:Record<string,unknown>)=>validId(c.id) && typeof c.name==='string').map((c:Record<string,unknown>)=>({id:c.id,name:c.name,status:typeof c.status==='string'?c.status:null,effectiveStatus:typeof c.effective_status==='string'?c.effective_status:null})), more: Boolean((data.paging as {next?:unknown}|undefined)?.next)};
+}
+
+export function parseAdAccounts(data:Record<string,unknown>) {
+ if(!Array.isArray(data.data)) throw new Error('Danh sách tài khoản không hợp lệ.');
+ const accounts=data.data.slice(0,100).filter((v:unknown)=>v && typeof v==='object'&&!Array.isArray(v)).map((v:Record<string,unknown>)=>({id:typeof v.account_id==='string'?v.account_id:typeof v.id==='string'?v.id.replace(/^act_/,''):'',name:typeof v.name==='string'?v.name:''})).filter((v:{id:string;name:string})=>validId(v.id)&&v.name);
+ return {accounts,more:Boolean((data.paging as {next?:unknown}|undefined)?.next)||data.data.length>100};
 }

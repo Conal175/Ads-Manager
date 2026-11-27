@@ -1,7 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import type {AppRole} from '@/lib/auth/policy';
-import {graphAds, MetaAdsError, parseCampaigns, validId} from '@/lib/meta-ad-management';
+import {graphAds, MetaAdsError, parseCampaigns, parseAdAccounts, validId} from '@/lib/meta-ad-management';
 import {INSIGHT_FIELDS, validInsightRequest, cleanInsightRows} from '@/lib/meta-insights';
 type Dependencies = {sameOrigin:()=>Promise<boolean>; authClient:()=>Promise<SupabaseClient>; resolveIdentity:(client:SupabaseClient)=>Promise<{authenticated:boolean;role:AppRole|null}>; pool:{query:(sql:string, params?:any[])=>Promise<{rows:any[];rowCount:number|null}>}; graphAds:typeof graphAds};
 const reply=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{'Cache-Control':'no-store'}});
@@ -30,6 +30,12 @@ export function createAdManagementHandler(deps:Dependencies) {
    if(body.action==='grant') { const result=await pool.query(`insert into public.meta_ad_account_grants (user_id,account_id,can_manage) select u.id,$2,$3 from auth.users u join public.app_user_roles r on r.user_id=u.id where u.id=$1 and u.email_confirmed_at is not null and r.role in ('operator','admin') on conflict (user_id,account_id) do update set can_manage=excluded.can_manage`,[body.userId,body.accountId,body.canManage]); if(!result.rowCount)return reply({error:'Người dùng phải xác nhận email và có vai trò operator hoặc admin.'},400); }
    else await pool.query('delete from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[body.userId,body.accountId]);
    return reply({ok:true});
+  }
+  if(body.action==='accounts') {
+   if(identity.role!=='admin') return reply({error:'Chỉ quản trị viên có thể liệt kê tài khoản Meta.'},403);
+   const token=process.env.META_READ_ACCESS_TOKEN?.trim(),version=process.env.META_GRAPH_API_VERSION?.trim()||'v24.0';
+   if(!token || !/^v\d{2}\.0$/.test(version)) return reply({error:'Kết nối Meta chưa được cấu hình hợp lệ trên máy chủ.'},503);
+   return reply(parseAdAccounts(await graphAds(token,version,'me/adaccounts',{fields:'id,account_id,name',limit:'100'})));
   }
   if(!validId(body.accountId)) return reply({error:'ID tài khoản quảng cáo không hợp lệ.'},400);
   if(identity.role!=='admin') {const {rows}=await pool.query('select can_manage from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[user.id,body.accountId]); if(!rows.length || (body.action==='setStatus' && !rows[0].can_manage)) return reply({error:'Bạn chưa được cấp quyền với tài khoản này.'},403);}

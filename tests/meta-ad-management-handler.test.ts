@@ -13,7 +13,7 @@ function fixture(options:Options={}) {
   authClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'11111111-1111-1111-1111-111111111111'}},error:null})}}),
   resolveIdentity:async()=>({authenticated:options.authenticated!==false,role:options.role===undefined?'operator':options.role}),
   pool:{query:async(sql:string)=>{queries.push(sql);if(sql.startsWith('select can_manage'))return {rows:options.grant?[{can_manage:!!options.manage}]:[],rowCount:options.grant?1:0};if(sql.startsWith('insert into'))return {rows:[],rowCount:options.grantRowCount??1};return {rows:[],rowCount:0};}},
-  graphAds:async(_token:string,_version:string,path:string,params:Record<string,string>,method?:string)=>{calls.push({path,params,method});if(method==='POST')return {success:true};if(path==='456')return {id:'456',account_id:options.campaignAccount??'123',status:options.campaignStatus??'ACTIVE'};if(path.endsWith('/campaigns'))return {data:[]};if(path.endsWith('/insights'))return {data:[]};return {id:'act_123',name:'Demo'};}
+  graphAds:async(_token:string,_version:string,path:string,params:Record<string,string>,method?:string)=>{calls.push({path,params,method});if(method==='POST')return {success:true};if(path==='me/adaccounts')return {data:[{id:'act_123',name:'Test'}]};if(path==='456')return {id:'456',account_id:options.campaignAccount??'123',status:options.campaignStatus??'ACTIVE'};if(path.endsWith('/campaigns'))return {data:[]};if(path.endsWith('/insights'))return {data:[]};return {id:'act_123',name:'Demo'};}
  };
  const handler=createAdManagementHandler(deps as unknown as Parameters<typeof createAdManagementHandler>[0]);
  async function post(body:object){const res=await handler(new NextRequest('https://app.test/api/meta/ad-management',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}));return {status:res.status,body:await res.json()};}
@@ -41,4 +41,9 @@ test('insights require account grants and reject invalid dates before Graph requ
  const denied=fixture();assert.equal((await denied.post(body)).status,403);assert.equal(denied.calls.length,0);
  const allowed=fixture({grant:true});assert.equal((await allowed.post({...body,level:'invalid'})).status,400);assert.equal(allowed.calls.length,0);
  const result=await allowed.post(body);assert.equal(result.status,200);assert.equal(allowed.calls[0].path,'act_123/insights');assert.equal(allowed.calls[0].params.level,'ad');assert.equal(allowed.calls[0].params.limit,'100');
+});
+
+test('only admin can enumerate Meta accounts; no token is returned',async()=>{
+ const operator=fixture({grant:true});assert.equal((await operator.post({action:'accounts'})).status,403);assert.equal(operator.calls.length,0);
+ const admin=fixture({role:'admin'});const result=await admin.post({action:'accounts'});assert.equal(result.status,200);assert.deepEqual(result.body.accounts,[{id:'123',name:'Test'}]);assert.equal(admin.calls[0].path,'me/adaccounts');assert(!JSON.stringify(result.body).includes('test-secret'));
 });
