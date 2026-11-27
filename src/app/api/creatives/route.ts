@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
         const [preview, productRows, creativeRows] = await Promise.all([
           previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId),
           db.select({ id: products.id, code: products.code }).from(products),
-          db.select({ id: creatives.id, productId: creatives.productId, driveFileId: creatives.driveFileId }).from(creatives),
+          db.select({ id: creatives.id, productId: creatives.productId, driveFileId: creatives.driveFileId, creativeCode: creatives.creativeCode }).from(creatives),
         ]);
         const matched = matchDriveInventory(preview.files, productRows, creativeRows);
         return NextResponse.json({...matched, warnings:preview.warnings, message:"Chỉ xem trước metadata, chưa nhập hay thay đổi dữ liệu."}, {headers:{"Cache-Control":"private, no-store"}});

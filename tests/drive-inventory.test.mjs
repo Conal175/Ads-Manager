@@ -22,11 +22,20 @@ test('classify existing, new, unknown and conflicting media without writing', as
  const creatives=[{id:1,productId:1,driveFileId:'old'},{id:2,productId:9,driveFileId:'other'},{id:3,productId:1,driveFileId:'dbdupe'},{id:4,productId:1,driveFileId:'dbdupe'}];
  const result=matchDriveInventory(files,products,creatives);
  assert.deepEqual(result.files.map(x=>x.status),['new','existing','unknown_product','product_conflict','duplicate_file','duplicate_file','ambiguous_product','duplicate_file']);
- assert.deepEqual(result.counts,{new:1,existing:1,unknown_product:1,product_conflict:1,duplicate_file:3,ambiguous_product:1});
+ assert.deepEqual(result.counts,{new:1,existing:1,unknown_product:1,product_conflict:1,duplicate_file:3,ambiguous_product:1,duplicate_code:0});
 });
 test('accept spaced and single-digit month folders, keep original path and ignore non-month folders',async()=>{
  const {normalizeMonthFolder}=await import('../src/lib/drive-inventory.ts');
  assert.equal(normalizeMonthFolder('2026 - 8'),'2026-08');assert.equal(normalizeMonthFolder('2026 -10'),'2026-10');assert.equal(normalizeMonthFolder('2026 - 11'),'2026-11');assert.equal(normalizeMonthFolder('2026-13'),null);assert.equal(normalizeMonthFolder('ADS Win'),null);
  const tree={root:[{id:'p',name:'Gi',mimeType:folder}],p:[{id:'m',name:'2026 - 8',mimeType:folder}],m:[{id:'v',name:'M019_1.mp4',mimeType:'video/mp4'}]};
  const result=await collectDriveInventory('root',async id=>tree[id]);assert.equal(result.files[0].month,'2026-08');assert.equal(result.files[0].path,'Gi/2026 - 8');
+});
+
+test('scan approved Gi ADS Win only, and flag already used media codes', async()=>{
+ const {matchDriveInventory}=await import('../src/lib/drive-inventory.ts');
+ const tree={root:[{id:'p',name:'Gi',mimeType:folder},{id:'q',name:'OTHER',mimeType:folder}],p:[{id:'win',name:'ADS Win',mimeType:folder}],q:[{id:'otherwin',name:'ADS Win',mimeType:folder}],win:[{id:'x',name:'M001_0627.mp4',mimeType:'video/mp4'},{id:'y',name:'M003_video.mp4',mimeType:'video/mp4'}]};
+ const scanned=[]; const inventory=await collectDriveInventory('root',async id=>{scanned.push(id); return tree[id]});
+ assert.deepEqual(scanned,['root','p','win','q']); assert.equal(inventory.files[0].path,'Gi/ADS Win');
+ const matched=matchDriveInventory(inventory.files,[{id:1,code:'GI'}],[{id:1,productId:1,driveFileId:'original',creativeCode:'M001'}]);
+ assert.deepEqual(matched.files.map(f=>f.status),['duplicate_code','new']);
 });
