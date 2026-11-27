@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import type {AppRole} from '@/lib/auth/policy';
 import {graphAds, MetaAdsError, parseCampaigns, parseAdAccounts, validId} from '@/lib/meta-ad-management';
-import {INSIGHT_FIELDS, validInsightRequest, cleanInsightRows} from '@/lib/meta-insights';
+import {INSIGHT_FIELDS, validInsightRequest, cleanInsightRows, validCursor} from '@/lib/meta-insights';
 type Dependencies = {sameOrigin:()=>Promise<boolean>; authClient:()=>Promise<SupabaseClient>; resolveIdentity:(client:SupabaseClient)=>Promise<{authenticated:boolean;role:AppRole|null}>; pool:{query:(sql:string, params?:any[])=>Promise<{rows:any[];rowCount:number|null}>}; graphAds:typeof graphAds};
 const reply=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export function createAdManagementHandler(deps:Dependencies) {
@@ -41,9 +41,21 @@ export function createAdManagementHandler(deps:Dependencies) {
   if(identity.role!=='admin') {const {rows}=await pool.query('select can_manage from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[user.id,body.accountId]); if(!rows.length || (body.action==='setStatus' && !rows[0].can_manage)) return reply({error:'Bạn chưa được cấp quyền với tài khoản này.'},403);}
   const token=process.env.META_READ_ACCESS_TOKEN?.trim(),version=process.env.META_GRAPH_API_VERSION?.trim()||'v24.0';
   if(!token || !/^v\d{2}\.0$/.test(version)) return reply({error:'Kết nối Meta chưa được cấu hình hợp lệ trên máy chủ.'},503);
+  if(body.action==='history') {
+   const {rows}=await pool.query(`select l.id::text,l.campaign_id,l.campaign_name,l.from_status,l.to_status,l.outcome,l.created_at,
+    case when $3::boolean then coalesce(u.email,'Người dùng đã xóa') when l.actor_id=$2 then 'Bạn' else 'Người dùng khác' end as actor
+    from public.meta_ad_change_log l left join auth.users u on u.id=l.actor_id
+    where l.account_id=$1 order by l.created_at desc,l.id desc limit 100`,[body.accountId,user.id,identity.role==='admin']);
+   return reply({history:rows});
+  }
   if(body.action==='insights') {
    if(!validInsightRequest(body.level,body.since,body.until)) return reply({error:'Khoảng ngày hoặc cấp báo cáo không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
-   const report=await graphAds(token,version,`act_${body.accountId}/insights`,{fields:INSIGHT_FIELDS,level:body.level,time_range:JSON.stringify({since:body.since,until:body.until}),limit:'100'});
+   if(body.after!==undefined && !validCursor(body.after)) return reply({error:'Trang báo cáo không hợp lệ.'},400);
+   if(body.parent!==undefined && (!body.parent || !validId(body.parent.id) || !['campaign','adset'].includes(body.parent.level) || (body.parent.level==='campaign' && !['adset','ad'].includes(body.level)) || (body.parent.level==='adset' && body.level!=='ad'))) return reply({error:'Bộ lọc báo cáo không hợp lệ.'},400);
+   const params:Record<string,string>={fields:INSIGHT_FIELDS,level:body.level,time_range:JSON.stringify({since:body.since,until:body.until}),limit:'100'};
+   if(body.after)params.after=body.after;
+   if(body.parent)params.filtering=JSON.stringify([{field:`${body.parent.level}.id`,operator:'IN',value:[body.parent.id]}]);
+   const report=await graphAds(token,version,`act_${body.accountId}/insights`,params);
    return reply(cleanInsightRows(report));
   }
   if(body.action==='load') {
@@ -59,8 +71,15 @@ export function createAdManagementHandler(deps:Dependencies) {
    const current=await graphAds(token,version,body.campaignId,{fields:'id,account_id,status,name'});
    if(current.id!==body.campaignId || String(current.account_id).replace(/^act_/,'')!==body.accountId) return reply({error:'Chiến dịch không thuộc tài khoản được cấp quyền.'},403);
    if(current.status!==body.expectedStatus) return reply({error:'Trạng thái đã thay đổi hoặc không hỗ trợ. Hãy tải lại trước khi thao tác.'},409);
-   const result=await graphAds(token,version,body.campaignId,{status:body.status},'POST');
-   if(result.success!==true) return reply({error:'Meta không xác nhận thành công. Hãy tải lại trạng thái.'},502);
+   const audit=await pool.query(`insert into public.meta_ad_change_log (actor_id,account_id,campaign_id,campaign_name,from_status,to_status,outcome) values ($1,$2,$3,$4,$5,$6,'pending') returning id::text`,[user.id,body.accountId,body.campaignId,typeof current.name==='string'?current.name.slice(0,500):'',body.expectedStatus,body.status]);
+   const auditId=audit.rows[0]?.id; if(!auditId)throw new Error('Không thể ghi lịch sử.');
+   let outcome='unknown';
+   try {
+    const result=await graphAds(token,version,body.campaignId,{status:body.status},'POST');
+    if(result.success!==true) return reply({error:'Meta không xác nhận thành công. Hãy tải lại trạng thái.'},502);
+    outcome='confirmed';
+   } catch(e) { if(e instanceof MetaAdsError)outcome='rejected'; throw e; }
+   finally { try {await pool.query('update public.meta_ad_change_log set outcome=$2,updated_at=now() where id=$1',[auditId,outcome]);}catch{/* Pending means outcome could not be recorded. */} }
    return reply({ok:true});
   }
   return reply({error:'Thao tác không hợp lệ.'},400);

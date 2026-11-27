@@ -4,7 +4,7 @@ import {NextRequest} from 'next/server';
 import {createAdManagementHandler} from '../src/lib/meta-ad-management-handler';
 import type {AppRole} from '../src/lib/auth/policy';
 
-type Options={origin?:boolean;authenticated?:boolean;role?:AppRole|null;grant?:boolean;manage?:boolean;campaignAccount?:string;campaignStatus?:string;grantRowCount?:number};
+type Options={origin?:boolean;authenticated?:boolean;role?:AppRole|null;grant?:boolean;manage?:boolean;campaignAccount?:string;campaignStatus?:string;grantRowCount?:number;auditFail?:boolean};
 function fixture(options:Options={}) {
  const calls:{path:string;method?:string;params:Record<string,string>}[]=[];
  const queries:string[]=[];
@@ -12,7 +12,7 @@ function fixture(options:Options={}) {
   sameOrigin:async()=>options.origin!==false,
   authClient:async()=>({auth:{getUser:async()=>({data:{user:{id:'11111111-1111-1111-1111-111111111111'}},error:null})}}),
   resolveIdentity:async()=>({authenticated:options.authenticated!==false,role:options.role===undefined?'operator':options.role}),
-  pool:{query:async(sql:string)=>{queries.push(sql);if(sql.startsWith('select can_manage'))return {rows:options.grant?[{can_manage:!!options.manage}]:[],rowCount:options.grant?1:0};if(sql.startsWith('insert into'))return {rows:[],rowCount:options.grantRowCount??1};return {rows:[],rowCount:0};}},
+  pool:{query:async(sql:string)=>{queries.push(sql);if(sql.startsWith('select can_manage'))return {rows:options.grant?[{can_manage:!!options.manage}]:[],rowCount:options.grant?1:0};if(sql.startsWith('insert into public.meta_ad_change_log')) {if(options.auditFail)throw new Error('db');return {rows:[{id:'1'}],rowCount:1};}if(sql.startsWith('insert into'))return {rows:[],rowCount:options.grantRowCount??1};return {rows:[],rowCount:0};}},
   graphAds:async(_token:string,_version:string,path:string,params:Record<string,string>,method?:string)=>{calls.push({path,params,method});if(method==='POST')return {success:true};if(path==='me/adaccounts')return {data:[{id:'act_123',name:'Test'}]};if(path==='456')return {id:'456',account_id:options.campaignAccount??'123',status:options.campaignStatus??'ACTIVE'};if(path.endsWith('/campaigns'))return {data:[]};if(path.endsWith('/insights'))return {data:[]};return {id:'act_123',name:'Demo'};}
  };
  const handler=createAdManagementHandler(deps as unknown as Parameters<typeof createAdManagementHandler>[0]);
@@ -46,4 +46,16 @@ test('insights require account grants and reject invalid dates before Graph requ
 test('only admin can enumerate Meta accounts; no token is returned',async()=>{
  const operator=fixture({grant:true});assert.equal((await operator.post({action:'accounts'})).status,403);assert.equal(operator.calls.length,0);
  const admin=fixture({role:'admin'});const result=await admin.post({action:'accounts'});assert.equal(result.status,200);assert.deepEqual(result.body.accounts,[{id:'123',name:'Test'}]);assert.equal(admin.calls[0].path,'me/adaccounts');assert(!JSON.stringify(result.body).includes('test-secret'));
+});
+
+test('writes require audit record first; history requires account grant',async()=>{
+ const body={action:'setStatus',accountId:'123',campaignId:'456',expectedStatus:'ACTIVE',status:'PAUSED'};
+ const blocked=fixture({grant:true,manage:true,auditFail:true});assert.equal((await blocked.post(body)).status,500);assert.equal(blocked.calls.filter(c=>c.method==='POST').length,0);
+ const ok=fixture({grant:true,manage:true});assert.equal((await ok.post(body)).status,200);assert(ok.queries.some(q=>q.startsWith('insert into public.meta_ad_change_log')));assert(ok.queries.some(q=>q.startsWith('update public.meta_ad_change_log')));
+ const denied=fixture();assert.equal((await denied.post({action:'history',accountId:'123'})).status,403);
+});
+test('insights validate cursors and drilldown filter',async()=>{
+ const base={action:'insights',accountId:'123',level:'adset',since:'2025-01-01',until:'2025-01-31'};const f=fixture({grant:true});
+ assert.equal((await f.post({...base,after:'https://evil'})).status,400);assert.equal((await f.post({...base,parent:{level:'campaign',id:'bad'}})).status,400);assert.equal(f.calls.length,0);
+ assert.equal((await f.post({...base,after:'abc_123=',parent:{level:'campaign',id:'456'}})).status,200);assert.equal(f.calls[0].params.after,'abc_123=');assert.deepEqual(JSON.parse(f.calls[0].params.filtering),[{field:'campaign.id',operator:'IN',value:['456']}]);
 });

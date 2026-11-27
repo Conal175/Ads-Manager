@@ -9,3 +9,8 @@ test('reports return only bounded permitted metrics and do not expose paging URL
  const data=cleanInsightRows({data:[{account_id:'1',spend:'0',actions:[{action_type:'purchase',value:'2',secret:'s'}],access_token:'hidden'}],paging:{next:'https://bad.example/secret'}});
  assert.equal(data.more,true);assert.deepEqual(data.rows,[{account_id:'1',spend:'0',actions:[{action_type:'purchase',value:'2'}]}]);assert(!JSON.stringify(data).includes('secret'));
 });
+
+test('pagination exposes only a bounded cursor and never a paging URL',()=>{
+ const result=cleanInsightRows({data:[],paging:{next:'https://bad/secret',cursors:{after:'abc_123='}}});assert.equal(result.nextCursor,'abc_123=');assert(!JSON.stringify(result).includes('https'));
+ assert.equal(cleanInsightRows({data:[],paging:{next:'https://bad',cursors:{after:'https://bad'}}}).nextCursor,null);
+});

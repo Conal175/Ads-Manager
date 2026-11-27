@@ -16,5 +16,10 @@ export function cleanInsightRows(data:Record<string,unknown>) {
   for(const key of fields){const value=r[key];if(key==='actions'||key==='cost_per_action_type') {if(Array.isArray(value)) result[key]=value.slice(0,100).filter(v=>v&&typeof v.action_type==='string'&&typeof v.value==='string').map(v=>({action_type:v.action_type,value:v.value}));}else if(typeof value==='string')result[key]=value;}
   return result;
  });
- return {rows,more:Boolean((data.paging as {next?:unknown}|undefined)?.next)||data.data.length>100};
+ const paging=data.paging as {next?:unknown;cursors?:{after?:unknown}}|undefined;
+ const after=paging?.cursors?.after;
+ const nextCursor=Boolean(paging?.next)&&validCursor(after)?after:null;
+ return {rows,more:Boolean(paging?.next)||data.data.length>100,nextCursor};
 }
+
+export function validCursor(v:unknown): v is string {return typeof v==='string' && /^[A-Za-z0-9_=-]{1,1024}$/.test(v);}
