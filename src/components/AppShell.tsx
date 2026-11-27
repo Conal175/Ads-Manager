@@ -10,9 +10,8 @@ const NAV_ITEMS = [
   { href: "/", label: "Tổng quan", shortDesc: "Dashboard & briefing", icon: LayoutDashboard },
   { href: "/products", label: "Sản phẩm & KPI", shortDesc: "Theo dõi hiệu quả", icon: Package },
   { href: "/creatives", label: "Kho nội dung", shortDesc: "Media & Post ID", icon: Film },
-  { href: "/ad-accounts", label: "Tài khoản quảng cáo", shortDesc: "Tài khoản & chiến dịch", icon: BarChart3 },
+  { href: "/ad-accounts", label: "Quảng cáo & báo cáo", shortDesc: "Meta & hiệu quả", icon: BarChart3 },
   { href: "/pages", label: "Quản lý Trang", shortDesc: "Fanpage & bài viết", icon: PanelsTopLeft },
-  { href: "/reports", label: "Báo cáo", shortDesc: "Phân tích & đối soát", icon: BarChart3 },
   { href: "/actions", label: "Đề xuất", shortDesc: "Các cơ hội cần xem", icon: Zap },
   { href: "/launcher", label: "Lên quảng cáo", shortDesc: "Bản nháp & thiết lập", icon: Rocket },
 ];
@@ -36,7 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (pathname === "/login" || pathname === "/register" || pathname === "/no-access" || pathname.startsWith("/auth/")) return <>{children}</>;
   const current = NAV_ITEMS.find(item => item.href === "/" ? pathname === "/" : pathname.startsWith(item.href));
-  const section = current?.label ?? (pathname.startsWith('/assets') || pathname.startsWith('/system') || pathname.startsWith('/users') ? 'Cài đặt & kết nối' : 'Không gian làm việc');
+  const section = pathname.startsWith('/reports') ? 'Quảng cáo & báo cáo' : current?.label ?? (pathname.startsWith('/assets') || pathname.startsWith('/system') || pathname.startsWith('/users') ? 'Cài đặt & kết nối' : 'Không gian làm việc');
 
   return <div className="min-h-screen flex flex-col lg:flex-row bg-[#f4f6fa]">
     <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between px-4 h-16 bg-white/95 backdrop-blur border-b border-slate-200">

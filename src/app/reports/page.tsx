@@ -1,5 +1,6 @@
 "use client";
 
+import {WorkspaceTabs} from "@/components/reports/WorkspaceTabs";
 import React, { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -347,6 +348,8 @@ function ReportsInner() {
 
 export default function ReportsPage() {
   return (
+    <>
+    <WorkspaceTabs active="reports"/>
     <Suspense
       fallback={
         <div className="h-96 bg-white rounded-xl border border-slate-200 animate-pulse" />
@@ -354,5 +357,6 @@ export default function ReportsPage() {
     >
       <ReportsInner />
     </Suspense>
+    </>
   );
 }

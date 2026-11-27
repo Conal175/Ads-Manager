@@ -35,3 +35,10 @@ test('mutation verifies campaign ownership and expected state before sending upd
  const stale=fixture({grant:true,manage:true,campaignStatus:'PAUSED'});assert.equal((await stale.post(body)).status,409);assert.equal(stale.calls.filter(c=>c.method==='POST').length,0);
  const allowed=fixture({grant:true,manage:true});assert.equal((await allowed.post(body)).status,200);assert.deepEqual(allowed.calls.map(c=>[c.path,c.method]),[['456',undefined],['456','POST']]);assert.equal(allowed.calls[1].params.status,'PAUSED');
 });
+
+test('insights require account grants and reject invalid dates before Graph request',async()=>{
+ const body={action:'insights',accountId:'123',level:'ad',since:'2025-01-01',until:'2025-01-31'};
+ const denied=fixture();assert.equal((await denied.post(body)).status,403);assert.equal(denied.calls.length,0);
+ const allowed=fixture({grant:true});assert.equal((await allowed.post({...body,level:'invalid'})).status,400);assert.equal(allowed.calls.length,0);
+ const result=await allowed.post(body);assert.equal(result.status,200);assert.equal(allowed.calls[0].path,'act_123/insights');assert.equal(allowed.calls[0].params.level,'ad');assert.equal(allowed.calls[0].params.limit,'100');
+});

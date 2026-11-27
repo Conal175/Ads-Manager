@@ -2,6 +2,7 @@ import {NextRequest,NextResponse} from 'next/server';
 import type {SupabaseClient} from '@supabase/supabase-js';
 import type {AppRole} from '@/lib/auth/policy';
 import {graphAds, MetaAdsError, parseCampaigns, validId} from '@/lib/meta-ad-management';
+import {INSIGHT_FIELDS, validInsightRequest, cleanInsightRows} from '@/lib/meta-insights';
 type Dependencies = {sameOrigin:()=>Promise<boolean>; authClient:()=>Promise<SupabaseClient>; resolveIdentity:(client:SupabaseClient)=>Promise<{authenticated:boolean;role:AppRole|null}>; pool:{query:(sql:string, params?:any[])=>Promise<{rows:any[];rowCount:number|null}>}; graphAds:typeof graphAds};
 const reply=(data:unknown,status=200)=>NextResponse.json(data,{status,headers:{'Cache-Control':'no-store'}});
 export function createAdManagementHandler(deps:Dependencies) {
@@ -34,6 +35,11 @@ export function createAdManagementHandler(deps:Dependencies) {
   if(identity.role!=='admin') {const {rows}=await pool.query('select can_manage from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[user.id,body.accountId]); if(!rows.length || (body.action==='setStatus' && !rows[0].can_manage)) return reply({error:'Bạn chưa được cấp quyền với tài khoản này.'},403);}
   const token=process.env.META_READ_ACCESS_TOKEN?.trim(),version=process.env.META_GRAPH_API_VERSION?.trim()||'v24.0';
   if(!token || !/^v\d{2}\.0$/.test(version)) return reply({error:'Kết nối Meta chưa được cấu hình hợp lệ trên máy chủ.'},503);
+  if(body.action==='insights') {
+   if(!validInsightRequest(body.level,body.since,body.until)) return reply({error:'Khoảng ngày hoặc cấp báo cáo không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
+   const report=await graphAds(token,version,`act_${body.accountId}/insights`,{fields:INSIGHT_FIELDS,level:body.level,time_range:JSON.stringify({since:body.since,until:body.until}),limit:'100'});
+   return reply(cleanInsightRows(report));
+  }
   if(body.action==='load') {
    const [account,campaigns,insights]=await Promise.all([
     graphAds(token,version,`act_${body.accountId}`,{fields:'id,name,account_status,currency'}),
