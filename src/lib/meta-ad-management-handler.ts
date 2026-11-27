@@ -52,7 +52,9 @@ export function createAdManagementHandler(deps:Dependencies) {
    if(!validInsightRequest(body.level,body.since,body.until)) return reply({error:'Khoảng ngày hoặc cấp báo cáo không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
    if(body.after!==undefined && !validCursor(body.after)) return reply({error:'Trang báo cáo không hợp lệ.'},400);
    if(body.parent!==undefined && (!body.parent || !validId(body.parent.id) || !['campaign','adset'].includes(body.parent.level) || (body.parent.level==='campaign' && !['adset','ad'].includes(body.level)) || (body.parent.level==='adset' && body.level!=='ad'))) return reply({error:'Bộ lọc báo cáo không hợp lệ.'},400);
+   if(body.demographics!==undefined && typeof body.demographics!=='boolean')return reply({error:'Phân tích nhân khẩu học không hợp lệ.'},400);
    const params:Record<string,string>={fields:INSIGHT_FIELDS,level:body.level,time_range:JSON.stringify({since:body.since,until:body.until}),limit:'100'};
+   if(body.demographics)params.breakdowns='age,gender';
    if(body.after)params.after=body.after;
    if(body.parent)params.filtering=JSON.stringify([{field:`${body.parent.level}.id`,operator:'IN',value:[body.parent.id]}]);
    const report=await graphAds(token,version,`act_${body.accountId}/insights`,params);

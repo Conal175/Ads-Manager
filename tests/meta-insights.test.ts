@@ -14,3 +14,11 @@ test('pagination exposes only a bounded cursor and never a paging URL',()=>{
  const result=cleanInsightRows({data:[],paging:{next:'https://bad/secret',cursors:{after:'abc_123='}}});assert.equal(result.nextCursor,'abc_123=');assert(!JSON.stringify(result).includes('https'));
  assert.equal(cleanInsightRows({data:[],paging:{next:'https://bad',cursors:{after:'https://bad'}}}).nextCursor,null);
 });
+
+test('demographic dimensions and exact action values are preserved without summing variants', async()=>{
+ const {actionValue}=await import('../src/lib/meta-insights');
+ const row=cleanInsightRows({data:[{age:'35-44',gender:'male',account_currency:'VND',actions:[{action_type:'purchase',value:'2'},{action_type:'offsite_conversion.purchase',value:'4'}]}]}).rows[0];
+ assert.equal(row.age,'35-44'); assert.equal(row.gender,'male'); assert.equal(row.account_currency,'VND');
+ assert.equal(actionValue(row,'actions','purchase'),'2'); assert.equal(actionValue(row,'actions','complete_registration'),'—');
+ assert.equal(actionValue({actions:[{action_type:'purchase',value:'1'},{action_type:'purchase',value:'2'}]},'actions','purchase'),'—');
+});
