@@ -7,7 +7,7 @@ export function normalizeMonthFolder(name: string): string | null {
 }
 const validId = (id: string) => /^[a-zA-Z0-9_-]+$/.test(id);
 /** Strictly bounded inventory. Does not follow shortcuts or modify files. */
-export async function collectDriveInventory(rootId: string, listChildren: (id: string) => Promise<DriveEntry[]>) {
+export async function collectDriveInventory(rootId: string, listChildren: (id: string) => Promise<DriveEntry[]>, scope?: {productId: string; folderId: string}) {
   if (!validId(rootId)) throw new Error('Invalid root');
   let calls = 0, scanned = 0;
   const list = async (id: string) => {
@@ -21,12 +21,17 @@ export async function collectDriveInventory(rootId: string, listChildren: (id: s
   const warnings: string[] = [];
   const productFolders = await list(rootId);
   const names = new Set<string>();
+  if (scope && !productFolders.some(p => p.id === scope.productId && p.mimeType === folderType)) throw new Error('Selected product folder not found');
   for (const product of productFolders) {
     if (product.mimeType !== folderType) { warnings.push(`Bỏ qua mục ở thư mục gốc: ${product.name}`); continue; }
     const code = product.name.trim().toUpperCase();
     if (!code || names.has(code)) throw new Error('Duplicate product folder');
     names.add(code);
-    for (const month of await list(product.id)) {
+    if (scope && product.id !== scope.productId) continue;
+    const months = await list(product.id);
+    if (scope && !months.some(m => m.id === scope.folderId && m.mimeType === folderType && (normalizeMonthFolder(m.name) || (code === 'GI' && m.name.trim().toUpperCase() === 'ADS WIN')))) throw new Error('Selected folder not found');
+    for (const month of months) {
+      if (scope && month.id !== scope.folderId) continue;
       // Only the explicitly approved Gi/ADS Win special folder is scanned outside month folders.
       const normalizedMonth = code === 'GI' && month.name.trim().toUpperCase() === 'ADS WIN' ? month.name : normalizeMonthFolder(month.name);
       if (month.mimeType !== folderType || !normalizedMonth) { warnings.push(`Bỏ qua mục không phải thư mục tháng: ${product.name}/${month.name}`); continue; }

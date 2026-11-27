@@ -39,3 +39,11 @@ test('scan approved Gi ADS Win only, and flag already used media codes', async()
  const matched=matchDriveInventory(inventory.files,[{id:1,code:'GI'}],[{id:1,productId:1,driveFileId:'original',creativeCode:'M001'}]);
  assert.deepEqual(matched.files.map(f=>f.status),['duplicate_code','new']);
 });
+test('scoped inventory scans only the chosen folder and rejects folders outside the selected product', async()=>{
+ const tree={root:[{id:'p',name:'Gi',mimeType:folder},{id:'q',name:'OTHER',mimeType:folder}],p:[{id:'m',name:'2026-11',mimeType:folder},{id:'win',name:'ADS Win',mimeType:folder}],q:[{id:'x',name:'2026-11',mimeType:folder}],m:[{id:'v',name:'M001.mp4',mimeType:'video/mp4'}]};
+ const scanned=[];const list=async id=>{scanned.push(id);return tree[id]};
+ const result=await collectDriveInventory('root',list,{productId:'p',folderId:'m'});
+ assert.deepEqual(scanned,['root','p','m']);assert.equal(result.files[0].path,'Gi/2026-11');
+ await assert.rejects(collectDriveInventory('root',list,{productId:'p',folderId:'x'}),/Selected folder/);
+ await assert.rejects(collectDriveInventory('root',list,{productId:'missing',folderId:'m'}),/Selected product/);
+});

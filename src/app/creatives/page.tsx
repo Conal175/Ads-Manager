@@ -32,6 +32,12 @@ export default function CreativesHubPage() {
   const [selectedDriveIds, setSelectedDriveIds] = useState<string[]>([]);
   const [importingDrive, setImportingDrive] = useState(false);
   const [hideExistingDrive, setHideExistingDrive] = useState(false);
+  const [folderPicker, setFolderPicker] = useState(false);
+  const [folderLoading, setFolderLoading] = useState(false);
+  const [productFolders, setProductFolders] = useState<Array<{id:string;name:string}>>([]);
+  const [subFolders, setSubFolders] = useState<Array<{id:string;name:string}>>([]);
+  const [driveProductFolder, setDriveProductFolder] = useState("");
+  const [driveFolder, setDriveFolder] = useState("");
   const [banner, setBanner] = useState<string | null>(null);
 
   const [filterProduct, setFilterProduct] = useState("ALL");
@@ -100,10 +106,21 @@ export default function CreativesHubPage() {
   }, [loadData]);
 
   const driveStatusLabel: Record<string, string> = {new:"Mới", existing:"Đã có", unknown_product:"Chưa có sản phẩm", product_conflict:"Khác sản phẩm đã lưu", duplicate_file:"Trùng ID file", ambiguous_product:"Mã sản phẩm không duy nhất", duplicate_code:"Mã media đã có trong kho"};
+  const loadFolders = async (productId = "") => {
+    setFolderLoading(true); setBanner(null);
+    try {
+      const res = await fetch('/api/creatives', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:'drive_folders', productId})});
+      const json = await res.json();
+      if (!res.ok) setBanner(json.error || 'Không thể tải thư mục.');
+      else if (productId) setSubFolders(json.folders); else setProductFolders(json.folders);
+    } catch { setBanner('Không thể tải thư mục Drive.'); }
+    finally { setFolderLoading(false); }
+  };
   const handlePreviewDrive = async () => {
+    if (!driveProductFolder || !driveFolder) return;
     setPreviewingDrive(true); setBanner(null); setDrivePreview(null); setSelectedDriveIds([]);
     try {
-      const res = await fetch("/api/creatives", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"preview_drive"})});
+      const res = await fetch("/api/creatives", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({action:"preview_drive", scope:{productId:driveProductFolder, folderId:driveFolder}})});
       const json = await res.json();
       if (!res.ok) setBanner(json.error || "Không thể xem trước Drive.");
       else { setDrivePreview(json); setBanner(json.message); }
@@ -117,7 +134,7 @@ export default function CreativesHubPage() {
     if (!window.confirm(`Nhập metadata của ${selected.length} media đã chọn vào kho? File vẫn nằm trên Drive; không ghi Sheet hoặc Meta.`)) return;
     setImportingDrive(true); setBanner(null);
     try {
-      const res = await fetch('/api/creatives/import-drive', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({confirm:true, selected}) });
+      const res = await fetch('/api/creatives/import-drive', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({confirm:true, selected, scope:{productId:driveProductFolder, folderId:driveFolder}}) });
       const json = await res.json();
       if (!res.ok) { setBanner(json.error || 'Không thể nhập metadata.'); return; }
       setDrivePreview(null); setSelectedDriveIds([]); setBanner(`${json.message}${json.skipped?.length ? ` ${json.skipped.join("; ")}` : ""}`); await loadData();
@@ -223,17 +240,27 @@ export default function CreativesHubPage() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
             Xuất danh mục CSV
           </a>
-          <button onClick={handlePreviewDrive} disabled={previewingDrive || importingDrive}
+          <button onClick={() => { setFolderPicker(true); void loadFolders(); }} disabled={previewingDrive || importingDrive || folderLoading}
             className="inline-flex items-center px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-            {previewingDrive ? "Đang đọc Drive..." : "Xem trước Drive"}
+            Chọn thư mục Drive
           </button>
         </div>
       </div>
 
       <FeedbackBanner message={banner} onClose={() => setBanner(null)} />
+      {folderPicker && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm space-y-3">
+        <div className="flex justify-between gap-3"><h2 className="font-semibold">Chọn thư mục cần quét</h2><button type="button" onClick={() => setFolderPicker(false)} className="text-blue-700">Đóng</button></div>
+        <p className="text-slate-500">Chọn sản phẩm và thư mục tháng hoặc ADS Win. Chỉ quét media trong thư mục đã chọn.</p>
+        <div className="flex flex-wrap gap-2">
+          <select aria-label="Thư mục sản phẩm Drive" disabled={folderLoading || previewingDrive || importingDrive} value={driveProductFolder} onChange={e => { const id=e.target.value; setDriveProductFolder(id); setDriveFolder(""); setSubFolders([]); setDrivePreview(null); setSelectedDriveIds([]); if (id) void loadFolders(id); }} className="rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Chọn sản phẩm</option>{productFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+          <select aria-label="Thư mục tháng Drive" disabled={!driveProductFolder || folderLoading || previewingDrive || importingDrive} value={driveFolder} onChange={e => {setDriveFolder(e.target.value); setDrivePreview(null); setSelectedDriveIds([]);}} className="rounded-lg border border-slate-300 bg-white px-3 py-2"><option value="">Chọn thư mục</option>{subFolders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+          <button type="button" onClick={handlePreviewDrive} disabled={!driveFolder || folderLoading || previewingDrive || importingDrive} className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{previewingDrive ? 'Đang quét…' : 'Xem trước thư mục'}</button>
+          {folderLoading && <span className="self-center text-slate-500">Đang tải thư mục…</span>}
+        </div>
+      </section>}
       {drivePreview && <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm">
         <div className="flex justify-between gap-3"><h2 className="font-semibold">Xem trước Drive: {drivePreview.files.length} file — chưa nhập dữ liệu</h2><button onClick={() => setDrivePreview(null)} className="text-blue-700">Đóng</button></div>
-        <p className="mt-2 text-slate-500">Hiển thị toàn bộ kết quả quét, gồm Gi/ADS Win; không thay đổi file hoặc cơ sở dữ liệu.</p>
+        <p className="mt-2 text-slate-500">Chỉ hiển thị kết quả trong thư mục đã chọn; không thay đổi file hoặc cơ sở dữ liệu.</p>
         <p className="mt-2 text-slate-600">{Object.entries(drivePreview.counts).map(([status,count]) => `${driveStatusLabel[status] ?? status}: ${count}`).join(" · ")}</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" disabled={importingDrive || selectedDriveIds.length >= 50 || !drivePreview.files.some(f => f.status === 'new' && !selectedDriveIds.includes(f.id))} onClick={() => setSelectedDriveIds(current => Array.from(new Set([...current, ...drivePreview.files.filter(f => f.status === 'new').map(f => f.id)])).slice(0, 50))} className="rounded-lg border border-blue-300 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">Chọn tất cả file mới (tối đa 50)</button>

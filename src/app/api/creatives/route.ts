@@ -12,8 +12,8 @@ import {
 } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
-import { previewDriveInventory } from "@/services/drive-inventory";
-import { matchDriveInventory } from "@/lib/drive-inventory";
+import { previewDriveInventory, driveFolderAccess } from "@/services/drive-inventory";
+import { matchDriveInventory, normalizeMonthFolder } from "@/lib/drive-inventory";
 
 export async function GET() {
   const denied = await authorizeApi("operator");
@@ -54,13 +54,30 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
+    if (body.action === "drive_folders") {
+      const [settings] = await db.select().from(systemSettings).limit(1);
+      const secrets = resolveEffectiveSecrets(settings);
+      if (!secrets.googleDriveRootFolderId || !secrets.googleServiceAccountJson) return NextResponse.json({error:"Chưa cấu hình Drive."}, {status:400});
+      try {
+        const list = await driveFolderAccess(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId);
+        const folderType = 'application/vnd.google-apps.folder';
+        const products = (await list(secrets.googleDriveRootFolderId)).filter(f => f.mimeType === folderType);
+        if (!body.productId) return NextResponse.json({folders: products.map(({id,name}) => ({id,name}))});
+        const product = products.find(f => f.id === body.productId);
+        if (!product) return NextResponse.json({error:'Thư mục sản phẩm không hợp lệ.'},{status:400});
+        const folders = (await list(product.id)).filter(f => f.mimeType === folderType && (normalizeMonthFolder(f.name) || (product.name.trim().toUpperCase() === 'GI' && f.name.trim().toUpperCase() === 'ADS WIN')));
+        return NextResponse.json({folders: folders.map(({id,name}) => ({id,name}))});
+      } catch { return NextResponse.json({error:'Không thể đọc danh sách thư mục Drive.'},{status:502}); }
+    }
+
     if (body.action === "preview_drive") {
       const [settings] = await db.select().from(systemSettings).limit(1);
       const secrets = resolveEffectiveSecrets(settings);
       if (!secrets.googleDriveRootFolderId || !secrets.googleServiceAccountJson) return NextResponse.json({error:"Chưa cấu hình thư mục Drive hoặc Service Account."}, {status:400});
+      if (!body.scope || typeof body.scope.productId !== 'string' || typeof body.scope.folderId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(body.scope.productId) || !/^[A-Za-z0-9_-]+$/.test(body.scope.folderId)) return NextResponse.json({error:'Vui lòng chọn thư mục để quét.'},{status:400});
       try {
         const [preview, productRows, creativeRows] = await Promise.all([
-          previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId),
+          previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId, body.scope),
           db.select({ id: products.id, code: products.code }).from(products),
           db.select({ id: creatives.id, productId: creatives.productId, driveFileId: creatives.driveFileId, creativeCode: creatives.creativeCode }).from(creatives),
         ]);

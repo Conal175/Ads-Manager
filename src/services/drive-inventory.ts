@@ -1,7 +1,7 @@
 import { GoogleAuth } from 'google-auth-library';
 import { collectDriveInventory, type DriveEntry } from '@/lib/drive-inventory';
 
-export async function previewDriveInventory(raw: string, rootId: string) {
+export async function driveFolderAccess(raw: string, rootId: string) {
   if (!/^[a-zA-Z0-9_-]+$/.test(rootId)) throw new Error('Invalid root');
   const parsed = JSON.parse(raw) as { client_email?: unknown; private_key?: unknown };
   if (typeof parsed.client_email !== 'string' || typeof parsed.private_key !== 'string') throw new Error('Invalid service account');
@@ -11,7 +11,8 @@ export async function previewDriveInventory(raw: string, rootId: string) {
   const root = await client.request<{mimeType?: string}>({url:`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(rootId)}?supportsAllDrives=true&fields=mimeType`,timeout:8000});
   if (root.data.mimeType !== 'application/vnd.google-apps.folder') throw new Error('Root is not a folder');
   let pages = 0;
-  return collectDriveInventory(rootId, async folderId => {
+  const listChildren = async (folderId: string) => {
+    if (!/^[a-zA-Z0-9_-]+$/.test(folderId)) throw new Error('Invalid folder');
     const entries: DriveEntry[] = [];
     let pageToken: string | undefined;
     do {
@@ -25,5 +26,12 @@ export async function previewDriveInventory(raw: string, rootId: string) {
       pageToken = response.data.nextPageToken;
     } while (pageToken);
     return entries;
-  });
+  };
+  return listChildren;
 }
+
+export async function previewDriveInventory(raw: string, rootId: string, scope?: {productId: string; folderId: string}) {
+  const list = await driveFolderAccess(raw, rootId);
+  return collectDriveInventory(rootId, list, scope);
+}
+

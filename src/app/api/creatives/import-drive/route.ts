@@ -20,16 +20,17 @@ function validSelection(value: unknown): value is DriveSelection[] {
 export async function POST(req: NextRequest) {
   const denied = await authorizeApi('operator', true);
   if (denied) return denied;
-  let body: { selected?: unknown; confirm?: unknown };
+  let body: { selected?: unknown; confirm?: unknown; scope?: {productId?: unknown; folderId?: unknown} };
   try { body = await req.json(); } catch { return NextResponse.json({error:'Dữ liệu không hợp lệ.'}, {status:400}); }
   if (!body || body.confirm !== true || !validSelection(body.selected)) return NextResponse.json({error:'Vui lòng xác nhận và chọn từ 1 đến 50 file hợp lệ.'}, {status:400});
+  if (!body.scope || typeof body.scope.productId !== 'string' || typeof body.scope.folderId !== 'string' || !/^[A-Za-z0-9_-]+$/.test(body.scope.productId) || !/^[A-Za-z0-9_-]+$/.test(body.scope.folderId)) return NextResponse.json({error:'Vui lòng chọn lại thư mục.'},{status:400});
   try {
     const [settings] = await db.select().from(systemSettings).limit(1);
     const secrets = resolveEffectiveSecrets(settings);
     if (!secrets.googleDriveRootFolderId || !secrets.googleServiceAccountJson) return NextResponse.json({error:'Chưa cấu hình thư mục Drive hoặc Service Account.'}, {status:400});
     // Re-read all relevant metadata, never trust the client to provide file contents or associations.
     let inventory;
-    try { inventory = await previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId); }
+    try { inventory = await previewDriveInventory(secrets.googleServiceAccountJson, secrets.googleDriveRootFolderId, {productId: body.scope.productId as string, folderId: body.scope.folderId as string}); }
     catch { return NextResponse.json({error:'Không thể đọc đầy đủ Drive. Chưa nhập dữ liệu.'}, {status:502}); }
     const result = await db.transaction(async tx => {
       // Fail closed unless both database constraints exist and are valid.
