@@ -13,7 +13,7 @@ import {
 import { desc, eq } from "drizzle-orm";
 import { ensureSeeded } from "@/lib/seed";
 import { previewDriveInventory, driveFolderAccess } from "@/services/drive-inventory";
-import { matchDriveInventory, normalizeMonthFolder } from "@/lib/drive-inventory";
+import { matchDriveInventory } from "@/lib/drive-inventory";
 
 export async function GET() {
   const denied = await authorizeApi("operator");
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
         if (!body.productId) return NextResponse.json({folders: products.map(({id,name}) => ({id,name}))});
         const product = products.find(f => f.id === body.productId);
         if (!product) return NextResponse.json({error:'Thư mục sản phẩm không hợp lệ.'},{status:400});
-        const folders = (await list(product.id)).filter(f => f.mimeType === folderType && (normalizeMonthFolder(f.name) || (product.name.trim().toUpperCase() === 'GI' && f.name.trim().toUpperCase() === 'ADS WIN')));
+        const folders = (await list(product.id)).filter(f => f.mimeType === folderType && !!f.name.trim());
         return NextResponse.json({folders: folders.map(({id,name}) => ({id,name}))});
       } catch { return NextResponse.json({error:'Không thể đọc danh sách thư mục Drive.'},{status:502}); }
     }

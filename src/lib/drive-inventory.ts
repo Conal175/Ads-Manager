@@ -29,11 +29,11 @@ export async function collectDriveInventory(rootId: string, listChildren: (id: s
     names.add(code);
     if (scope && product.id !== scope.productId) continue;
     const months = await list(product.id);
-    if (scope && !months.some(m => m.id === scope.folderId && m.mimeType === folderType && (normalizeMonthFolder(m.name) || (code === 'GI' && m.name.trim().toUpperCase() === 'ADS WIN')))) throw new Error('Selected folder not found');
+    if (scope && !months.some(m => m.id === scope.folderId && m.mimeType === folderType && !!m.name.trim())) throw new Error('Selected folder not found');
     for (const month of months) {
       if (scope && month.id !== scope.folderId) continue;
-      // Only the explicitly approved Gi/ADS Win special folder is scanned outside month folders.
-      const normalizedMonth = code === 'GI' && month.name.trim().toUpperCase() === 'ADS WIN' ? month.name : normalizeMonthFolder(month.name);
+      // Explicit selection permits any direct subfolder; unscoped scans retain the existing restrictions.
+      const normalizedMonth = normalizeMonthFolder(month.name) ?? ((scope || (code === 'GI' && month.name.trim().toUpperCase() === 'ADS WIN')) ? month.name.trim() : null);
       if (month.mimeType !== folderType || !normalizedMonth) { warnings.push(`Bỏ qua mục không phải thư mục tháng: ${product.name}/${month.name}`); continue; }
       for (const file of await list(month.id)) {
         if (!validId(file.id)) throw new Error('Invalid file id');
