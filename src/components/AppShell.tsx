@@ -4,12 +4,13 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { canViewPage, type AppRole } from "@/lib/auth/policy";
-import { LayoutDashboard, Settings2, Package, Film, Rocket, BarChart3, Zap, Menu, X, ArrowUpRight, Layers3 } from "lucide-react";
+import { LayoutDashboard, Settings2, Package, Film, Rocket, BarChart3, Zap, Menu, X, ArrowUpRight, Layers3, PanelsTopLeft } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/", label: "Tổng quan", shortDesc: "Dashboard & briefing", icon: LayoutDashboard },
   { href: "/products", label: "Sản phẩm & KPI", shortDesc: "Theo dõi hiệu quả", icon: Package },
   { href: "/creatives", label: "Kho nội dung", shortDesc: "Media & Post ID", icon: Film },
+  { href: "/pages", label: "Quản lý Trang", shortDesc: "Fanpage & bài viết", icon: PanelsTopLeft },
   { href: "/reports", label: "Báo cáo", shortDesc: "Phân tích & đối soát", icon: BarChart3 },
   { href: "/actions", label: "Đề xuất", shortDesc: "Các cơ hội cần xem", icon: Zap },
   { href: "/launcher", label: "Lên quảng cáo", shortDesc: "Bản nháp & thiết lập", icon: Rocket },
