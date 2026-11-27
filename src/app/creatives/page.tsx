@@ -11,6 +11,7 @@ import {
   type NewCreativeFormState,
 } from "@/components/creatives/CreativeModals";
 import type { CreativeDTO, MediaCacheDTO, MetaPostDTO } from "@/types/domain";
+import { isAlreadyInCatalog, orderDrivePreview } from "@/lib/drive-preview-order";
 import { filterAndSortCreatives } from "@/lib/creative-filters";
 import type { DriveSelection } from "@/lib/drive-import-plan";
 
@@ -30,6 +31,7 @@ export default function CreativesHubPage() {
   const [drivePreview, setDrivePreview] = useState<{files: Array<DriveSelection & {status:string}>; warnings:string[]; counts:Record<string, number>} | null>(null);
   const [selectedDriveIds, setSelectedDriveIds] = useState<string[]>([]);
   const [importingDrive, setImportingDrive] = useState(false);
+  const [hideExistingDrive, setHideExistingDrive] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
 
   const [filterProduct, setFilterProduct] = useState("ALL");
@@ -236,10 +238,12 @@ export default function CreativesHubPage() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" disabled={importingDrive || selectedDriveIds.length >= 50 || !drivePreview.files.some(f => f.status === 'new' && !selectedDriveIds.includes(f.id))} onClick={() => setSelectedDriveIds(current => Array.from(new Set([...current, ...drivePreview.files.filter(f => f.status === 'new').map(f => f.id)])).slice(0, 50))} className="rounded-lg border border-blue-300 px-3 py-1.5 font-semibold text-blue-700 hover:bg-blue-50 disabled:opacity-50">Chọn tất cả file mới (tối đa 50)</button>
           <button type="button" disabled={importingDrive || selectedDriveIds.length === 0} onClick={() => setSelectedDriveIds([])} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Bỏ chọn tất cả</button>
+          <button type="button" disabled={importingDrive || !drivePreview.files.some(f => isAlreadyInCatalog(f.status) && selectedDriveIds.includes(f.id))} onClick={() => setSelectedDriveIds(current => current.filter(id => !drivePreview.files.some(f => f.id === id && isAlreadyInCatalog(f.status))))} className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Bỏ chọn file đã có</button>
+          <label className="inline-flex items-center gap-1.5 text-slate-700"><input type="checkbox" checked={hideExistingDrive} onChange={e => setHideExistingDrive(e.target.checked)} />Ẩn file đã có / trùng mã</label>
           <span className="text-slate-500" aria-live="polite">Đã chọn {selectedDriveIds.length}/50</span>
         </div>
-        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{drivePreview.files.map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all"><label><input type="checkbox" className="mr-2" disabled={f.status !== 'new' || importingDrive || (!selectedDriveIds.includes(f.id) && selectedDriveIds.length >= 50)} checked={selectedDriveIds.includes(f.id)} onChange={e => setSelectedDriveIds(current => e.target.checked ? [...current, f.id] : current.filter(id => id !== f.id))} />{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}{f.sizeBytes && Number(f.sizeBytes) >= 80_000_000 ? ' · ≥ 80 MB' : ''}</label></li>)}</ul>
-        <p className="mt-3 text-slate-500">Chọn tối đa 50 file mới mỗi lần. Tên file phải bắt đầu bằng mã media duy nhất, ví dụ M001_ten.mp4. Mục trùng được bỏ qua; nếu file thay đổi hoặc không rõ sản phẩm, lượt nhập sẽ dừng để kiểm tra.</p>
+        <ul className="mt-3 max-h-64 overflow-auto divide-y divide-slate-100">{orderDrivePreview(drivePreview.files, hideExistingDrive).map((f,i) => <li key={`${f.id}-${i}`} className="py-2 break-all"><label><input type="checkbox" className="mr-2" disabled={f.status !== 'new' || importingDrive || (!selectedDriveIds.includes(f.id) && selectedDriveIds.length >= 50)} checked={selectedDriveIds.includes(f.id)} onChange={e => setSelectedDriveIds(current => e.target.checked ? [...current, f.id] : current.filter(id => id !== f.id))} />{f.productCode} / {f.month} / {f.name} <span className="text-slate-400">({f.mimeType})</span> — {driveStatusLabel[f.status] ?? f.status}{f.sizeBytes && Number(f.sizeBytes) >= 80_000_000 ? ' · ≥ 80 MB' : ''}</label></li>)}</ul>
+        <p className="mt-3 text-slate-500">File đã có hoặc trùng mã được đưa xuống cuối và không thể chọn nhập. Chọn tối đa 50 file mới mỗi lần. Tên file phải bắt đầu bằng mã media duy nhất, ví dụ M001_ten.mp4. Mục trùng được bỏ qua; nếu file thay đổi hoặc không rõ sản phẩm, lượt nhập sẽ dừng để kiểm tra.</p>
         <button type="button" onClick={handleImportDrive} disabled={!selectedDriveIds.length || importingDrive || previewingDrive} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white disabled:opacity-50">{importingDrive ? 'Đang nhập…' : `Nhập metadata đã chọn (${selectedDriveIds.length})`}</button>
         {drivePreview.warnings.length > 0 && <details className="mt-3 text-amber-700"><summary>{drivePreview.warnings.length} mục bị bỏ qua</summary><ul className="max-h-40 overflow-auto">{drivePreview.warnings.slice(0,100).map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
       </section>}
