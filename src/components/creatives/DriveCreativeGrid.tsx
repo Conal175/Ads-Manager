@@ -13,6 +13,15 @@ interface DriveCreativeGridProps {
   productsList: Array<{ id: number; code: string; name: string }>;
   filterProduct: string;
   filterStatus: string;
+  search: string;
+  filterType: string;
+  filterSize: string;
+  sort: string;
+  onSearch: (val: string) => void;
+  onChangeFilterType: (val: string) => void;
+  onChangeFilterSize: (val: string) => void;
+  onChangeSort: (val: string) => void;
+  onResetFilters: () => void;
   onChangeFilterProduct: (val: string) => void;
   onChangeFilterStatus: (val: string) => void;
   onChangeLifecycle: (creativeId: number, status: string) => void;
@@ -22,10 +31,12 @@ interface DriveCreativeGridProps {
 
 export function DriveCreativeGrid({
   creatives,
+  allCreativesCount,
   sizeWarningCount,
   productsList,
   filterProduct,
   filterStatus,
+  search, filterType, filterSize, sort, onSearch, onChangeFilterType, onChangeFilterSize, onChangeSort, onResetFilters,
   onChangeFilterProduct,
   onChangeFilterStatus,
   onChangeLifecycle,
@@ -36,7 +47,8 @@ export function DriveCreativeGrid({
     <div className="space-y-4">
       <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          <select
+          <input aria-label="Tìm media" placeholder="Tìm mã, tên, thư mục..." value={search} onChange={e=>onSearch(e.target.value)} className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white" />
+          <select aria-label="Lọc sản phẩm"
             value={filterProduct}
             onChange={(e) => onChangeFilterProduct(e.target.value)}
             className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
@@ -48,7 +60,7 @@ export function DriveCreativeGrid({
               </option>
             ))}
           </select>
-          <select
+          <select aria-label="Lọc trạng thái vòng đời"
             value={filterStatus}
             onChange={(e) => onChangeFilterStatus(e.target.value)}
             className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-medium bg-white"
@@ -59,6 +71,11 @@ export function DriveCreativeGrid({
             <option value="winning">Winning</option>
             <option value="bao_hoa">Bão hòa</option>
           </select>
+          <select aria-label="Lọc loại media" value={filterType} onChange={e=>onChangeFilterType(e.target.value)} className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"><option value="ALL">Tất cả loại</option><option value="video">Video</option><option value="image">Ảnh</option></select>
+          <select aria-label="Lọc dung lượng" value={filterSize} onChange={e=>onChangeFilterSize(e.target.value)} className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"><option value="ALL">Mọi dung lượng</option><option value="large">≥ 80 MB</option><option value="normal">Dưới 80 MB</option></select>
+          <select aria-label="Sắp xếp media" value={sort} onChange={e=>onChangeSort(e.target.value)} className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"><option value="newest">Mới nhập trước</option><option value="oldest">Nhập cũ trước</option><option value="code_asc">Mã A–Z</option><option value="code_desc">Mã Z–A</option><option value="name_asc">Tên A–Z</option><option value="size_desc">Dung lượng lớn trước</option><option value="size_asc">Dung lượng nhỏ trước</option></select>
+          <button type="button" onClick={onResetFilters} className="text-xs font-semibold text-blue-700">Xóa bộ lọc</button>
+          <span className="text-xs text-slate-500" aria-live="polite">Hiển thị {creatives.length}/{allCreativesCount} media</span>
           <span className="text-xs text-slate-500 flex items-center gap-1.5 ml-1">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
             {sizeWarningCount} video ≥ 80MB cần nén
@@ -74,6 +91,7 @@ export function DriveCreativeGrid({
         </button>
       </div>
 
+      {creatives.length === 0 && <p className="rounded-xl bg-white border border-slate-200 p-6 text-sm text-slate-500">Không có media phù hợp với bộ lọc.</p>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {creatives.map((cr) => {
           const statusMeta =

@@ -42,15 +42,16 @@ export async function POST(req: NextRequest) {
       ]);
       const plan = planDriveImport(inventory.files, productRows, creativeRows, body.selected as DriveSelection[]);
       if (plan.errors.length) return {error:`Chưa nhập dữ liệu: ${plan.errors.join(' ')}`, status:409};
+      if (!plan.rows.length) return {inserted: [], skipped: plan.skipped, status:200};
       const inserted = await tx.insert(creatives).values(plan.rows.map(({file, productId, creativeCode, fileSizeMb, durationSec}) => ({
         creativeCode, productId, driveFileId:file.id, driveFolderPath:file.path, fileName:file.name,
         mediaType:file.mimeType.startsWith('image/') ? 'image' : 'video', fileSizeMb, durationSec,
         sizeWarning:fileSizeMb >= 80, thumbnailUrl:'', hookAngle:'', lifecycleStatus:'cho_test',
       }))).returning({id:creatives.id, creativeCode:creatives.creativeCode});
-      return {inserted, status:200};
+      return {inserted, skipped: plan.skipped, status:200};
     }, {isolationLevel:'serializable'});
     if (result.error) return NextResponse.json({error:result.error}, {status:result.status});
-    return NextResponse.json({inserted:result.inserted, message:`Đã nhập metadata của ${result.inserted?.length ?? 0} media. File vẫn nằm trên Drive.`}, {headers:{'Cache-Control':'private, no-store'}});
+    return NextResponse.json({inserted:result.inserted, skipped:result.skipped, message:`Đã nhập metadata của ${result.inserted?.length ?? 0} media; bỏ qua ${result.skipped?.length ?? 0} mục trùng. File vẫn nằm trên Drive.`}, {headers:{'Cache-Control':'private, no-store'}});
   } catch (err) {
     const e = err as {code?:string;cause?:{code?:string}};
     if (['23505','40001','23503'].includes(e.code ?? '') || ['23505','40001','23503'].includes(e.cause?.code ?? '')) return NextResponse.json({error:'Dữ liệu vừa thay đổi hoặc bị trùng. Chưa nhập; hãy xem trước lại.'},{status:409});

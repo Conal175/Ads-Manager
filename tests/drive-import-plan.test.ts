@@ -13,12 +13,12 @@ test('plans two selected files without copying video bytes',()=>{
 });
 test('rejects changed, duplicate, missing or ambiguous records',()=>{
  assert.ok(planDriveImport([a],products,[],[{...select(a),name:'old.mp4'}]).errors.length);
- assert.ok(planDriveImport([a],products,[],[select(a),select(a)]).errors.length);
+ assert.equal(planDriveImport([a],products,[],[select(a),select(a)]).skipped.length,1);
  assert.ok(planDriveImport([],products,[],[select(a)]).errors.length);
  assert.ok(planDriveImport([a],[],[],[select(a)]).errors.length);
- assert.ok(planDriveImport([a],products,[{id:4,productId:1,driveFileId:'a',creativeCode:'M001'}],[select(a)]).errors.length);
- assert.ok(planDriveImport([a],products,[{id:4,productId:1,driveFileId:'other',creativeCode:'m001'}],[select(a)]).errors.length);
- const c=file('c','M001_second.mp4'); assert.ok(planDriveImport([a,c],products,[],[select(a),select(c)]).errors.length);
+ assert.equal(planDriveImport([a],products,[{id:4,productId:1,driveFileId:'a',creativeCode:'M001'}],[select(a)]).skipped.length,1);
+ assert.equal(planDriveImport([a],products,[{id:4,productId:1,driveFileId:'other',creativeCode:'m001'}],[select(a)]).skipped.length,1);
+ const c=file('c','M001_second.mp4'); const duplicate=planDriveImport([a,b,c],products,[],[select(a),select(b),select(c)]); assert.deepEqual(duplicate.rows.map(r=>r.creativeCode),['M002']); assert.equal(duplicate.skipped.length,2);
  assert.ok(planDriveImport([{...a,sizeBytes:null}],products,[],[{...select(a),sizeBytes:null}]).errors.length);
  assert.ok(planDriveImport([{...a,name:'untitled.mp4'}],products,[],[{...select(a),name:'untitled.mp4'}]).errors.length);
 });
