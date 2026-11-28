@@ -70,3 +70,21 @@
 .step-icon { display:flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:12px; color:#534bc7; background:#eeedff; }
 .step-number { color:#8993a6; font-size:10px; font-weight:700; letter-spacing:.12em; }
 @media (max-width:640px) { .report-hero { padding:24px; } .report-hero-art { opacity:.25; right:5%; } }
+
+/* A light, calm shared frame for every workspace. */
+.app-sidebar { background:#fff; border-right:1px solid #dce8e8; }
+.brand-mark { background:linear-gradient(145deg,#188c87,#116962); box-shadow:0 5px 14px rgba(13,110,104,.2); }
+.nav-entry { color:#475569; }
+.nav-entry:hover { background:#f1f8f7; color:#115e59; }
+.nav-entry-active { color:#115e59; background:#e9f6f3; border-color:#cfe9e4; }
+.nav-icon { color:#728590; }
+.nav-entry-active .nav-icon { color:#fff; background:#16827a; }
+.shortcut-entry { display:flex; align-items:center; gap:9px; padding:9px 8px; border-radius:8px; font-size:12px; font-weight:600; color:#59716f; }
+.shortcut-entry:hover, .shortcut-entry-active { background:#d9f0eb; color:#115e59; }
+.workspace-bar { border-color:#e1ebeb; background:rgba(255,255,255,.88); }
+.app-content { background:radial-gradient(ellipse 65% 35% at 100% 0%,#e9f6f2 0%,transparent 65%),#f4f8f8; }
+.app-content :where(button, a, input, select, textarea):focus-visible { outline-color:#0d9488; }
+.app-content :where(input, select, textarea):focus { border-color:#0d9488; }
+.app-content :where(button.bg-blue-600,button.bg-indigo-600) { background-color:#0f766e; box-shadow:0 4px 12px -5px rgba(15,118,110,.5); }
+.app-content :where(button.bg-blue-600:hover:not(:disabled),button.bg-indigo-600:hover:not(:disabled)) { background-color:#115e59; }
+.app-content :where(tbody tr:hover) { background-color:#f2faf8; }
