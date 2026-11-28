@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { CreativeWorkspaceTabs } from "@/components/creatives/CreativeWorkspaceTabs";
 import { DriveCreativeGrid } from "@/components/creatives/DriveCreativeGrid";
 import { PostIdAndCacheSection } from "@/components/creatives/PostIdAndCacheSection";
 import {
@@ -202,6 +203,7 @@ export default function CreativesHubPage() {
 
   return (
     <div className="space-y-6">
+      <CreativeWorkspaceTabs active="library"/>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
@@ -235,7 +237,6 @@ export default function CreativesHubPage() {
               Cache & Post ID ({allPosts.length})
             </button>
           </div>
-          <a href="/creatives/sheet-preview" className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-medium text-blue-700">Đối chiếu Sheet media</a>
           <a href="/api/creatives/export" download="danh-muc-media.csv"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-300 bg-white text-slate-700 hover:bg-slate-50">
             Xuất danh mục CSV
