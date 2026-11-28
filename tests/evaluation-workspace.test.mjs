@@ -62,3 +62,11 @@ test('legacy rules respect access and require confirmation before changes',()=>{
  assert.match(ui,/function applyLegacy[\s\S]*window.confirm/);
  assert.match(ui,/async function deleteLegacy[\s\S]*window.confirm/);
 });
+test('account search filters loaded names and IDs without pulling data',()=>{
+ const src=read('src/app/ad-accounts/page.tsx');
+ assert.match(src,/aria-label="Tìm tài khoản quảng cáo theo tên hoặc ID"/);
+ assert.match(src,/accounts\.filter\(a=>`\$\{a\.name\} \$\{a\.id\}`/);
+ assert.match(src,/grants\.filter\(g=>g\.account_id\.includes\(accountQuery\)\)/);
+ assert.match(src,/onChange=\{e=>setAccountSearch\(e\.target\.value\)\}/);
+ assert.match(src,/Tài khoản đang chọn vẫn được giữ lại/);
+});
