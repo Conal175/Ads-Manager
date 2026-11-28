@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const read=(path)=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 test('account selection does not itself load account data',()=>{
  const src=read('src/app/ad-accounts/page.tsx');
- assert.match(src,/onChange=\{e=>\{const id=e\.target\.value;setAccountId\(id\);setData\(null\);\}\}/);
+ assert.match(src,/onChange=\{e=>\{const id=e\.target\.value;setAccountId\(id\);setData\(null\);/);
  assert.doesNotMatch(src,/void load\(saved\)/);
  assert.match(src,/onClick=\{\(\)=>load\(\)\}/);
 });
@@ -69,4 +69,15 @@ test('account search filters loaded names and IDs without pulling data',()=>{
  assert.match(src,/grants\.filter\(g=>g\.account_id\.includes\(accountQuery\)\)/);
  assert.match(src,/onChange=\{e=>setAccountSearch\(e\.target\.value\)\}/);
  assert.match(src,/Tài khoản đang chọn vẫn được giữ lại/);
+});
+
+test('navigation restores memory only after identity and account grants are checked',()=>{
+ const a=read('src/app/ad-accounts/page.tsx');const e=read('src/components/reports/EvaluationWorkspace.tsx');const m=read('src/lib/meta-workspace-memory.ts');
+ assert.match(a,/cached\?\.userId===uid&&\(d.admin\|\|!!grant\)/);
+ assert.match(e,/cached.userId===uid&&\(d.admin\|\|list.some/);
+ assert.match(e,/action:'rules'/);assert.match(e,/evaluateMedia/);
+ assert.doesNotMatch(m,/sessionStorage|localStorage/);
+ assert.match(a,/metaWorkspaceMemory.setAccount\(null\)/);
+ assert.match(e,/metaWorkspaceMemory.setEvaluation\(null\)/);
+ const detail=read('src/components/reports/MetaInsights.tsx');assert.match(detail,/metaInsightsMemory.get/);assert.match(detail,/skipInitial/);
 });
