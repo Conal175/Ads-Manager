@@ -81,3 +81,19 @@ test('navigation restores memory only after identity and account grants are chec
  assert.match(e,/metaWorkspaceMemory.setEvaluation\(null\)/);
  const detail=read('src/components/reports/MetaInsights.tsx');assert.match(detail,/metaInsightsMemory.get/);assert.match(detail,/skipInitial/);
 });
+test('completed matched pulls automatically save media periods and replace only overlapping keys atomically',()=>{
+ const api=read('src/app/api/meta/evaluation/route.ts');
+ assert.match(api,/status==='complete'&&report\.review\.length===0&&report\.groups\.length>0/);
+ assert.match(api,/saveMediaPeriods\(body\.accountId/);
+ const save=api.slice(api.indexOf('async function saveMediaPeriods'));
+ assert.match(save,/pg_advisory_xact_lock/);
+ assert.match(save,/p\.account_id=\$1 and p\.campaign_id=n\.campaign_id and p\.media_code=n\.media_code/);
+ assert.match(save,/p\.since_date <= \$3::date and p\.until_date >= \$2::date/);
+ assert.match(save,/p\.pulled_at > \$5::timestamptz/);
+ assert(save.indexOf('delete from public.meta_media_periods')<save.indexOf('insert into public.meta_media_periods'));
+ assert.match(save,/db.query\('ROLLBACK'\)/);
+ assert(api.indexOf("if(identity.role!=='admin'){\n   const grant")<api.indexOf("if(body.action==='mediaHistory')"));
+ const migration=read('supabase/migrations/20261121170000_meta_media_periods.sql');
+ assert.match(migration,/enable row level security/);
+ assert.match(migration,/revoke all on public.meta_media_periods/);
+});

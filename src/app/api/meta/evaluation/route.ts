@@ -77,6 +77,11 @@ export async function POST(req:Request){
    const grant=await pool.query('select 1 from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[user.id,body.accountId]);
    if(!grant.rowCount)return reply({error:'Bạn chưa được cấp quyền với tài khoản này.'},403);
   }
+  if(body.action==='mediaHistory'){
+   const result=await pool.query(`select campaign_id,media_code,since_date::text as since,until_date::text as until,pulled_at,data from public.meta_media_periods where account_id=$1 order by until_date desc,pulled_at desc,id desc limit 501`,[body.accountId]);
+   const rules=await readGlobalRules();
+   return reply({periods:result.rows.slice(0,500).map(r=>({...r,evaluation:evaluateMedia({objective:r.data.objective,spend:r.data.spend,results:r.data.results,reach:r.data.reach,complete:true,matched:true,rule:rules[r.data.objective as Objective]??null})})),more:result.rows.length>500});
+  }
   if(body.action==='history'){
    const history=await pool.query(`select id::text,since_date::text as since,until_date::text as until,status,started_at,finished_at from public.meta_evaluation_runs where account_id=$1 order by id desc limit 100`,[body.accountId]);
    return reply({history:history.rows});
@@ -125,7 +130,13 @@ export async function POST(req:Request){
     const snap={user:user.id,accountId:body.accountId,since:body.since,until:body.until,startedAt,finishedAt,status,error,rows,sheet,expires:Date.now()+24*60*60*1000};
     const snapshot=JSON.stringify(snap),signature=createHmac('sha256',token).update(snapshot).digest('hex');
     const report=await buildReport({status,started_at:startedAt,finished_at:finishedAt,error_message:error,rows,sheet},identity.role==='admin');
-    return reply({report,snapshot,signature,message:more?'Chưa tải hết dữ liệu; không đưa ra kết luận. Giới hạn hiện tại 400 dòng/lần.':'Đã kéo dữ liệu tạm cho kỳ đã chọn.'});
+    let savedMedia=0,removedMedia=0,saveError:string|null=null;
+    if(status==='complete'&&report.review.length===0&&report.groups.length>0){
+     try {const saved=await saveMediaPeriods(body.accountId,body.since,body.until,user.id,startedAt,finishedAt,groupInsights(rows,sheet).groups);savedMedia=saved.count;removedMedia=saved.removed;}
+     catch {saveError='Đã kéo dữ liệu nhưng không thể lưu lịch sử media; dữ liệu cũ vẫn được giữ. Hãy thử lại.';}
+    }
+    const message=more?'Chưa tải hết dữ liệu; không lưu lịch sử media hoặc đưa ra kết luận. Giới hạn 400 dòng/lần.':report.review.length?'Có dòng cần kiểm tra; chưa lưu lịch sử media để tránh thiếu số liệu.':saveError||(!report.groups.length?'Không có media khớp để lưu.':`Đã lưu ${savedMedia} media; thay thế ${removedMedia} kỳ cũ giao nhau.`);
+    return reply({report,snapshot,signature,savedMedia,removedMedia,saveError,message});
    } catch {
     return reply({error:'Không thể kéo dữ liệu Meta hoặc đọc Sheet. Kiểm tra kết nối và quyền; chưa đánh giá.'},502);
    }
@@ -144,4 +155,16 @@ async function readGlobalRules(){
  const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_global_rules`);
  const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
  return ruleMap;
+}
+
+async function saveMediaPeriods(accountId:string,since:string,until:string,userId:string,startedAt:string,finishedAt:string,groups:{campaignId:string;mediaCode:string;campaignName:string;objective:Objective;link:string;spend:number|null;results:number|null;reach:number|null;ads:Record<string,unknown>[]}[]){
+ const payload=JSON.stringify(groups.map(g=>({campaign_id:g.campaignId,media_code:g.mediaCode,data:{campaignName:g.campaignName,objective:g.objective,link:g.link,currency:typeof g.ads[0]?.account_currency==='string'?g.ads[0].account_currency:null,spend:g.spend,results:g.results,reach:g.reach,ads:g.ads}})));
+ const db=await pool.connect();try{
+  await db.query('BEGIN');await db.query("select pg_advisory_xact_lock(hashtext('meta-media:' || $1))",[accountId]);
+  const newer=await db.query(`select 1 from public.meta_media_periods p join jsonb_to_recordset($4::jsonb) as n(campaign_id text,media_code text,data jsonb) on p.campaign_id=n.campaign_id and p.media_code=n.media_code where p.account_id=$1 and p.since_date <= $3::date and p.until_date >= $2::date and p.pulled_at > $5::timestamptz limit 1`,[accountId,since,until,payload,startedAt]);
+  if(newer.rowCount)throw new Error('Một lượt kéo mới hơn đã lưu dữ liệu giao kỳ.');
+  const removed=await db.query(`delete from public.meta_media_periods p using jsonb_to_recordset($4::jsonb) as n(campaign_id text,media_code text,data jsonb) where p.account_id=$1 and p.campaign_id=n.campaign_id and p.media_code=n.media_code and p.since_date <= $3::date and p.until_date >= $2::date`,[accountId,since,until,payload]);
+  const inserted=await db.query(`insert into public.meta_media_periods(account_id,campaign_id,media_code,since_date,until_date,pulled_at,actor_id,data) select $1,n.campaign_id,n.media_code,$2::date,$3::date,$5::timestamptz,$6::uuid,n.data from jsonb_to_recordset($4::jsonb) as n(campaign_id text,media_code text,data jsonb)`,[accountId,since,until,payload,finishedAt,userId]);
+  await db.query('COMMIT');return {count:inserted.rowCount??0,removed:removed.rowCount??0};
+ }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
 }
