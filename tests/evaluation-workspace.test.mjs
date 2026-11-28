@@ -13,7 +13,7 @@ test('global rules table needs no account and evaluation sync stays manual',()=>
  const evalUi=read('src/components/reports/EvaluationWorkspace.tsx');
  assert.match(ui,/action:'rules'/);
  assert.match(ui,/action:'saveRules'/);
- assert.doesNotMatch(ui,/accountId/);
+ assert.match(ui,/request\(\{action:'rules'\}\)/);
  assert.match(ui,/objectives\.map/);
  assert.match(evalUi,/onClick=\{pull\}/);
  assert.equal((evalUi.match(/action:'sync'/g)||[]).length,1);
@@ -28,7 +28,7 @@ test('global rule writes require admin and all report reads use global rules',()
  assert.match(save,/db.query\('BEGIN'\)/);
  assert.match(save,/db.query\('ROLLBACK'\)/);
  assert.match(src,/const ruleMap=await readGlobalRules\(\)/);
- assert.doesNotMatch(src,/from public.meta_evaluation_rules where account_id/);
+ assert.doesNotMatch(src.slice(src.indexOf('async function buildReport')),/from public.meta_evaluation_rules/);
 });
 test('pull is temporary and explicit save replaces overlapping history atomically',()=>{
  const api=read('src/app/api/meta/evaluation/route.ts');
@@ -47,4 +47,18 @@ test('pull is temporary and explicit save replaces overlapping history atomicall
  assert.match(ui,/onClick=\{saveSnapshot\}/);
  assert.match(ui,/window\.confirm/);
  assert.match(ui,/action:'savedReport'/);
+});
+
+test('legacy rules respect access and require confirmation before changes',()=>{
+ const api=read('src/app/api/meta/evaluation/route.ts');
+ const legacy=api.slice(api.indexOf("if(body.action==='legacyRules')"),api.indexOf("if(body.action==='saveRules')"));
+ assert.match(legacy,/meta_ad_account_grants/);
+ assert.match(legacy,/identity.role!=='admin'/);
+ assert.match(legacy,/updated_at::text=\$3/);
+ assert.doesNotMatch(legacy,/delete from public\.meta_evaluation_global_rules/);
+ const ui=read('src/components/reports/GlobalRules.tsx');
+ assert.match(ui,/action:'legacyRules'/);
+ assert.match(ui,/action:'deleteLegacyRule'/);
+ assert.match(ui,/function applyLegacy[\s\S]*window.confirm/);
+ assert.match(ui,/async function deleteLegacy[\s\S]*window.confirm/);
 });

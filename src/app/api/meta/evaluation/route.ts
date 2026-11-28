@@ -44,6 +44,19 @@ export async function POST(req:Request){
   const {data:{user}}=await client.auth.getUser();if(!user)return reply({error:'Vui lòng đăng nhập.'},401);
   const body=await req.json();
   if(body.action==='rules')return reply({run:null,groups:[],review:[],rules:await readGlobalRules(),admin:identity.role==='admin'});
+  if(body.action==='legacyRules'){
+   const result=identity.role==='admin'
+    ? await pool.query(`select account_id,objective,min_spend::text,min_results::text,target::text,warning_margin_pct::text,updated_at::text from public.meta_evaluation_rules order by updated_at desc,account_id,objective limit 501`)
+    : await pool.query(`select r.account_id,r.objective,r.min_spend::text,r.min_results::text,r.target::text,r.warning_margin_pct::text,r.updated_at::text from public.meta_evaluation_rules r where exists (select 1 from public.meta_ad_account_grants g where g.user_id=$1 and g.account_id=r.account_id) order by r.updated_at desc,r.account_id,r.objective limit 501`,[user.id]);
+   return reply({rules:result.rows.slice(0,500),more:result.rows.length>500});
+  }
+  if(body.action==='deleteLegacyRule'){
+   if(identity.role!=='admin')return reply({error:'Chỉ quản trị viên có thể xóa quy tắc cũ.'},403);
+   if(!validId(body.accountId)||!OBJECTIVES.includes(body.objective)||typeof body.updatedAt!=='string'||body.updatedAt.length>100)return reply({error:'Quy tắc cũ không hợp lệ.'},400);
+   const result=await pool.query(`delete from public.meta_evaluation_rules where account_id=$1 and objective=$2 and updated_at::text=$3 returning objective`,[body.accountId,body.objective,body.updatedAt]);
+   if(!result.rowCount)return reply({error:'Quy tắc đã thay đổi hoặc không còn tồn tại. Hãy tải lại.'},409);
+   return reply({ok:true});
+  }
   if(body.action==='saveRules'){
    if(identity.role!=='admin')return reply({error:'Chỉ quản trị viên có thể thiết lập quy tắc.'},403);
    if(!body.rules||typeof body.rules!=='object'||Array.isArray(body.rules)||Object.keys(body.rules).some(key=>!OBJECTIVES.includes(key as Objective))||OBJECTIVES.some(objective=>body.rules[objective]!==null&&!validRule(body.rules[objective])))return reply({error:'Quy tắc không hợp lệ; hãy kiểm tra đầy đủ các ngưỡng.'},400);
