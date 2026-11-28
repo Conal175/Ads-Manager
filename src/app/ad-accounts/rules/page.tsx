@@ -1,2 +1,2 @@
-import {EvaluationWorkspace} from '@/components/reports/EvaluationWorkspace';
-export default function RulesPage(){return <EvaluationWorkspace view="rules"/>;}
+import {GlobalRules} from '@/components/reports/GlobalRules';
+export default function RulesPage(){return <GlobalRules/>;}

@@ -8,19 +8,27 @@ test('account selection does not itself load account data',()=>{
  assert.doesNotMatch(src,/void load\(saved\)/);
  assert.match(src,/onClick=\{\(\)=>load\(\)\}/);
 });
-test('rules and evaluation are separate views and sync happens on explicit click',()=>{
- const src=read('src/components/reports/EvaluationWorkspace.tsx');
- assert.match(src,/if\(view==='rules'\)request\(.*action:'rules'/);
- assert.match(src,/onClick=\{pull\}/);
- assert.equal((src.match(/action:'sync'/g)||[]).length,1);
- assert.match(src,/view==='rules'&&<section/);
- assert.match(src,/view==='evaluation'&&<>/);
+test('global rules table needs no account and evaluation sync stays manual',()=>{
+ const ui=read('src/components/reports/GlobalRules.tsx');
+ const evalUi=read('src/components/reports/EvaluationWorkspace.tsx');
+ assert.match(ui,/action:'rules'/);
+ assert.match(ui,/action:'saveRules'/);
+ assert.doesNotMatch(ui,/accountId/);
+ assert.match(ui,/objectives\.map/);
+ assert.match(evalUi,/onClick=\{pull\}/);
+ assert.equal((evalUi.match(/action:'sync'/g)||[]).length,1);
 });
-test('rules endpoint authorizes the account before rule reads and writes',()=>{
+test('global rule writes require admin and all report reads use global rules',()=>{
  const src=read('src/app/api/meta/evaluation/route.ts');
- assert(src.indexOf("if(identity.role!=='admin'){")<src.indexOf("if(body.action==='rules')"));
- assert(src.indexOf("if(identity.role!=='admin'){")<src.indexOf("if(body.action==='rule')"));
- assert.match(src,/if\(identity\.role!=='admin'\)return reply\(\{error:'Chỉ quản trị viên/);
+ assert(src.indexOf("if(!['admin','operator']")<src.indexOf("if(body.action==='rules')"));
+ assert(src.indexOf("if(body.action==='rules')")<src.indexOf('if(!validId(body.accountId))'));
+ const save=src.slice(src.indexOf("if(body.action==='saveRules')"),src.indexOf('if(!validId(body.accountId))'));
+ assert.match(save,/identity.role!=='admin'/);
+ assert.match(save,/OBJECTIVES.some/);
+ assert.match(save,/db.query\('BEGIN'\)/);
+ assert.match(save,/db.query\('ROLLBACK'\)/);
+ assert.match(src,/const ruleMap=await readGlobalRules\(\)/);
+ assert.doesNotMatch(src,/from public.meta_evaluation_rules where account_id/);
 });
 test('pull is temporary and explicit save replaces overlapping history atomically',()=>{
  const api=read('src/app/api/meta/evaluation/route.ts');

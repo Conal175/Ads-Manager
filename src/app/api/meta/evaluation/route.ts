@@ -43,22 +43,26 @@ export async function POST(req:Request){
   if(!['admin','operator'].includes(identity.role||''))return reply({error:'Bạn không có quyền.'},403);
   const {data:{user}}=await client.auth.getUser();if(!user)return reply({error:'Vui lòng đăng nhập.'},401);
   const body=await req.json();
+  if(body.action==='rules')return reply({run:null,groups:[],review:[],rules:await readGlobalRules(),admin:identity.role==='admin'});
+  if(body.action==='saveRules'){
+   if(identity.role!=='admin')return reply({error:'Chỉ quản trị viên có thể thiết lập quy tắc.'},403);
+   if(!body.rules||typeof body.rules!=='object'||Array.isArray(body.rules)||Object.keys(body.rules).some(key=>!OBJECTIVES.includes(key as Objective))||OBJECTIVES.some(objective=>body.rules[objective]!==null&&!validRule(body.rules[objective])))return reply({error:'Quy tắc không hợp lệ; hãy kiểm tra đầy đủ các ngưỡng.'},400);
+   const db=await pool.connect();
+   try{
+    await db.query('BEGIN');
+    await db.query("select pg_advisory_xact_lock(hashtext('meta-global-rules'))");
+    for(const objective of OBJECTIVES){
+     const rule:EvaluationRule|null=body.rules[objective];
+     if(rule===null){await db.query('delete from public.meta_evaluation_global_rules where objective=$1',[objective]);continue;}
+     await db.query(`insert into public.meta_evaluation_global_rules(objective,min_spend,min_results,target,warning_margin_pct) values($1,$2,$3,$4,$5) on conflict(objective) do update set min_spend=excluded.min_spend,min_results=excluded.min_results,target=excluded.target,warning_margin_pct=excluded.warning_margin_pct,updated_at=now()`,[objective,rule.minSpend,rule.minResults,rule.target,rule.warningMarginPct]);
+    }
+    await db.query('COMMIT');return reply({ok:true});
+   }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
+  }
   if(!validId(body.accountId))return reply({error:'ID tài khoản không hợp lệ.'},400);
   if(identity.role!=='admin'){
    const grant=await pool.query('select 1 from public.meta_ad_account_grants where user_id=$1 and account_id=$2',[user.id,body.accountId]);
    if(!grant.rowCount)return reply({error:'Bạn chưa được cấp quyền với tài khoản này.'},403);
-  }
-  if(body.action==='rule'){
-   if(identity.role!=='admin')return reply({error:'Chỉ quản trị viên có thể thiết lập quy tắc.'},403);
-   if(!OBJECTIVES.includes(body.objective)||!validRule(body.rule))return reply({error:'Quy tắc không hợp lệ.'},400);
-   const r:EvaluationRule=body.rule;
-   await pool.query(`insert into public.meta_evaluation_rules(account_id,objective,min_spend,min_results,target,warning_margin_pct) values($1,$2,$3,$4,$5,$6) on conflict(account_id,objective) do update set min_spend=excluded.min_spend,min_results=excluded.min_results,target=excluded.target,warning_margin_pct=excluded.warning_margin_pct,updated_at=now()`,[body.accountId,body.objective,r.minSpend,r.minResults,r.target,r.warningMarginPct]);
-   return reply({ok:true});
-  }
-  if(body.action==='rules'){
-   const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_rules where account_id=$1`,[body.accountId]);
-   const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
-   return reply({run:null,groups:[],review:[],rules:ruleMap,admin:identity.role==='admin'});
   }
   if(body.action==='history'){
    const history=await pool.query(`select id::text,since_date::text as since,until_date::text as until,status,started_at,finished_at from public.meta_evaluation_runs where account_id=$1 order by id desc limit 100`,[body.accountId]);
@@ -68,7 +72,7 @@ export async function POST(req:Request){
    if(typeof body.id!=='string'||!/^\d{1,20}$/.test(body.id))return reply({error:'Bản lưu không hợp lệ.'},400);
    const result=await pool.query(`select id::text,status,started_at,finished_at,error_message,rows,sheet,since_date::text as since,until_date::text as until from public.meta_evaluation_runs where account_id=$1 and id=$2`,[body.accountId,body.id]);
    if(!result.rows[0])return reply({error:'Không tìm thấy bản lưu.'},404);
-   return reply(await buildReport(result.rows[0],body.accountId,identity.role==='admin'));
+   return reply(await buildReport(result.rows[0],identity.role==='admin'));
   }
   if(!validInsightRequest('ad',body.since,body.until))return reply({error:'Khoảng ngày không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
   if(body.action==='save'){
@@ -107,7 +111,7 @@ export async function POST(req:Request){
     const error=more?'Còn trang chưa tải hoặc không có cursor hợp lệ; chưa đủ dữ liệu để đánh giá.':null;
     const snap={user:user.id,accountId:body.accountId,since:body.since,until:body.until,startedAt,finishedAt,status,error,rows,sheet,expires:Date.now()+24*60*60*1000};
     const snapshot=JSON.stringify(snap),signature=createHmac('sha256',token).update(snapshot).digest('hex');
-    const report=await buildReport({status,started_at:startedAt,finished_at:finishedAt,error_message:error,rows,sheet},body.accountId,identity.role==='admin');
+    const report=await buildReport({status,started_at:startedAt,finished_at:finishedAt,error_message:error,rows,sheet},identity.role==='admin');
     return reply({report,snapshot,signature,message:more?'Chưa tải hết dữ liệu; không đưa ra kết luận. Giới hạn hiện tại 400 dòng/lần.':'Đã kéo dữ liệu tạm cho kỳ đã chọn.'});
    } catch {
     return reply({error:'Không thể kéo dữ liệu Meta hoặc đọc Sheet. Kiểm tra kết nối và quyền; chưa đánh giá.'},502);
@@ -116,10 +120,15 @@ export async function POST(req:Request){
   return reply({error:'Thao tác không hợp lệ.'},400);
  }catch{return reply({error:'Không thể xử lý yêu cầu. Kiểm tra cấu hình và quyền hệ thống.'},500);}
 }
-async function buildReport(run:{id?:string;status:string;started_at:string;finished_at:string|null;error_message:string|null;rows:Record<string,unknown>[];sheet:SheetMedia[];since?:string;until?:string},accountId:string,admin:boolean){
- const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_rules where account_id=$1`,[accountId]);
- const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
+async function buildReport(run:{id?:string;status:string;started_at:string;finished_at:string|null;error_message:string|null;rows:Record<string,unknown>[];sheet:SheetMedia[];since?:string;until?:string},admin:boolean){
+ const ruleMap=await readGlobalRules();
  const {groups,review}=groupInsights(run.rows,run.sheet);
  const evaluated=groups.map(g=>({...g,ads:g.ads.map(a=>({ad_id:a.ad_id,ad_name:a.ad_name,spend:a.spend,reach:a.reach,actions:a.actions})),evaluation:evaluateMedia({objective:g.objective,spend:g.spend,results:g.results,reach:g.reach,complete:run.status==='complete'&&review.length===0,matched:true,rule:ruleMap[g.objective]??null})}));
  return {run:{id:run.id,status:run.status,startedAt:run.started_at,finishedAt:run.finished_at,error:run.error_message,count:run.rows.length,since:run.since,until:run.until},groups:evaluated,review,rules:ruleMap,admin};
+}
+
+async function readGlobalRules(){
+ const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_global_rules`);
+ const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
+ return ruleMap;
 }
