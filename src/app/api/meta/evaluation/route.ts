@@ -54,6 +54,11 @@ export async function POST(req:Request){
    await pool.query(`insert into public.meta_evaluation_rules(account_id,objective,min_spend,min_results,target,warning_margin_pct) values($1,$2,$3,$4,$5,$6) on conflict(account_id,objective) do update set min_spend=excluded.min_spend,min_results=excluded.min_results,target=excluded.target,warning_margin_pct=excluded.warning_margin_pct,updated_at=now()`,[body.accountId,body.objective,r.minSpend,r.minResults,r.target,r.warningMarginPct]);
    return reply({ok:true});
   }
+  if(body.action==='rules'){
+   const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_rules where account_id=$1`,[body.accountId]);
+   const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
+   return reply({run:null,groups:[],review:[],rules:ruleMap,admin:identity.role==='admin'});
+  }
   if(!validInsightRequest('ad',body.since,body.until))return reply({error:'Khoảng ngày không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
   if(body.action==='sync'){
    const db=await pool.connect();let runId:string|undefined;
