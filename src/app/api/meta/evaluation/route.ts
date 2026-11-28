@@ -1,3 +1,4 @@
+import {createHmac,timingSafeEqual} from 'node:crypto';
 import {GoogleAuth} from 'google-auth-library';
 import {authClient,sameOrigin} from '@/lib/auth/server';
 import {resolveIdentity} from '@/lib/auth/identity';
@@ -59,14 +60,36 @@ export async function POST(req:Request){
    const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
    return reply({run:null,groups:[],review:[],rules:ruleMap,admin:identity.role==='admin'});
   }
+  if(body.action==='history'){
+   const history=await pool.query(`select id::text,since_date::text as since,until_date::text as until,status,started_at,finished_at from public.meta_evaluation_runs where account_id=$1 order by id desc limit 100`,[body.accountId]);
+   return reply({history:history.rows});
+  }
+  if(body.action==='savedReport'){
+   if(typeof body.id!=='string'||!/^\d{1,20}$/.test(body.id))return reply({error:'Bản lưu không hợp lệ.'},400);
+   const result=await pool.query(`select id::text,status,started_at,finished_at,error_message,rows,sheet,since_date::text as since,until_date::text as until from public.meta_evaluation_runs where account_id=$1 and id=$2`,[body.accountId,body.id]);
+   if(!result.rows[0])return reply({error:'Không tìm thấy bản lưu.'},404);
+   return reply(await buildReport(result.rows[0],body.accountId,identity.role==='admin'));
+  }
   if(!validInsightRequest('ad',body.since,body.until))return reply({error:'Khoảng ngày không hợp lệ (tối đa 366 ngày, không chọn ngày tương lai).'},400);
-  if(body.action==='sync'){
-   const db=await pool.connect();let runId:string|undefined;
-   try {
+  if(body.action==='save'){
+   const secret=process.env.META_READ_ACCESS_TOKEN?.trim();
+   if(!secret||typeof body.snapshot!=='string'||body.snapshot.length>5000000||typeof body.signature!=='string'||!/^[a-f0-9]{64}$/.test(body.signature))return reply({error:'Dữ liệu tạm không hợp lệ; hãy kéo lại.'},400);
+   const signature=createHmac('sha256',secret).update(body.snapshot).digest();
+   if(!timingSafeEqual(signature,Buffer.from(body.signature,'hex')))return reply({error:'Dữ liệu tạm không hợp lệ; hãy kéo lại.'},400);
+   const snap=JSON.parse(body.snapshot);
+   if(snap.user!==user.id||snap.accountId!==body.accountId||snap.since!==body.since||snap.until!==body.until||!Number.isFinite(snap.expires)||snap.expires<Date.now()||!Array.isArray(snap.rows)||!Array.isArray(snap.sheet)||snap.status!=='complete')return reply({error:'Dữ liệu tạm hết hạn hoặc không khớp; hãy kéo lại.'},400);
+   const db=await pool.connect();
+   try{
     await db.query('BEGIN');
-    const locked=await db.query<{locked:boolean}>("select pg_try_advisory_xact_lock(hashtext('meta-eval:' || $1)) as locked",[body.accountId]);
-    if(!locked.rows[0].locked)return reply({error:'Tài khoản đang được kéo dữ liệu. Hãy thử lại sau.'},409);
-    const run=await db.query<{id:string}>(`insert into public.meta_evaluation_runs(account_id,since_date,until_date,status,actor_id) values($1,$2,$3,'running',$4) returning id::text`,[body.accountId,body.since,body.until,user.id]);runId=run.rows[0].id;
+    await db.query("select pg_advisory_xact_lock(hashtext('meta-eval:' || $1))",[body.accountId]);
+    const removed=await db.query(`delete from public.meta_evaluation_runs where account_id=$1 and since_date <= $3::date and until_date >= $2::date`,[body.accountId,body.since,body.until]);
+    await db.query(`insert into public.meta_evaluation_runs(account_id,since_date,until_date,status,actor_id,started_at,finished_at,rows,sheet,error_message) values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10)`,[body.accountId,body.since,body.until,snap.status,user.id,snap.startedAt,snap.finishedAt,JSON.stringify(snap.rows),JSON.stringify(snap.sheet),snap.error]);
+    await db.query('COMMIT');return reply({ok:true,removed:removed.rowCount});
+   }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
+  }
+  if(body.action==='sync'){
+   try {
+    const startedAt=new Date().toISOString();
     const token=process.env.META_READ_ACCESS_TOKEN?.trim(),version=process.env.META_GRAPH_API_VERSION?.trim()||'v24.0';
     if(!token||!/^v\d{2}\.0$/.test(version))throw new Error('Kết nối Meta chưa được cấu hình.');
     const sheet=await readSheet();const rows:Record<string,unknown>[]=[];let after:string|null=null,more=false;const cursors=new Set<string>();
@@ -80,26 +103,23 @@ export async function POST(req:Request){
      if(!page.nextCursor||cursors.has(page.nextCursor))break;
      cursors.add(page.nextCursor);after=page.nextCursor;
     }
-    const status=more?'partial':'complete';
-    await db.query(`update public.meta_evaluation_runs set status=$2,finished_at=now(),rows=$3::jsonb,sheet=$4::jsonb,error_message=$5 where id=$1`,[runId,status,JSON.stringify(rows),JSON.stringify(sheet),more?'Còn trang chưa tải hoặc không có cursor hợp lệ; chưa đủ dữ liệu để đánh giá.':null]);
-    await db.query('COMMIT');
-    return reply({status,count:rows.length,message:more?'Chưa tải hết dữ liệu; không đưa ra kết luận. Giới hạn hiện tại 400 dòng/lần.':'Đã kéo dữ liệu cho kỳ đã chọn.'});
+    const status=more?'partial':'complete',finishedAt=new Date().toISOString();
+    const error=more?'Còn trang chưa tải hoặc không có cursor hợp lệ; chưa đủ dữ liệu để đánh giá.':null;
+    const snap={user:user.id,accountId:body.accountId,since:body.since,until:body.until,startedAt,finishedAt,status,error,rows,sheet,expires:Date.now()+24*60*60*1000};
+    const snapshot=JSON.stringify(snap),signature=createHmac('sha256',token).update(snapshot).digest('hex');
+    const report=await buildReport({status,started_at:startedAt,finished_at:finishedAt,error_message:error,rows,sheet},body.accountId,identity.role==='admin');
+    return reply({report,snapshot,signature,message:more?'Chưa tải hết dữ liệu; không đưa ra kết luận. Giới hạn hiện tại 400 dòng/lần.':'Đã kéo dữ liệu tạm cho kỳ đã chọn.'});
    } catch {
-    if(runId)await db.query("update public.meta_evaluation_runs set status='failed',finished_at=now(),error_message='Không thể kéo dữ liệu Meta hoặc đọc Sheet. Kiểm tra kết nối và quyền.' where id=$1",[runId]).catch(()=>{});
-    await db.query('COMMIT').catch(()=>{});
     return reply({error:'Không thể kéo dữ liệu Meta hoặc đọc Sheet. Kiểm tra kết nối và quyền; chưa đánh giá.'},502);
-   } finally {await db.query('ROLLBACK').catch(()=>{});db.release();}
-  }
-  if(body.action==='report'){
-   const result=await pool.query(`select id::text,status,started_at,finished_at,error_message,rows,sheet from public.meta_evaluation_runs where account_id=$1 and since_date=$2 and until_date=$3 order by id desc limit 1`,[body.accountId,body.since,body.until]);
-   const run=result.rows[0]??null;
-   const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_rules where account_id=$1`,[body.accountId]);
-   const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
-   if(!run)return reply({run:null,groups:[],review:[],rules:ruleMap,admin:identity.role==='admin'});
-   const {groups,review}=groupInsights(run.rows,run.sheet);
-   const evaluated=groups.map(g=>({...g,ads:g.ads.map(a=>({ad_id:a.ad_id,ad_name:a.ad_name,spend:a.spend,reach:a.reach,actions:a.actions})),evaluation:evaluateMedia({objective:g.objective,spend:g.spend,results:g.results,reach:g.reach,complete:run.status==='complete'&&review.length===0,matched:true,rule:ruleMap[g.objective]??null})}));
-   return reply({run:{id:run.id,status:run.status,startedAt:run.started_at,finishedAt:run.finished_at,error:run.error_message,count:run.rows.length},groups:evaluated,review,rules:ruleMap,admin:identity.role==='admin'});
+   }
   }
   return reply({error:'Thao tác không hợp lệ.'},400);
  }catch{return reply({error:'Không thể xử lý yêu cầu. Kiểm tra cấu hình và quyền hệ thống.'},500);}
+}
+async function buildReport(run:{id?:string;status:string;started_at:string;finished_at:string|null;error_message:string|null;rows:Record<string,unknown>[];sheet:SheetMedia[];since?:string;until?:string},accountId:string,admin:boolean){
+ const rules=await pool.query(`select objective,min_spend,min_results,target,warning_margin_pct from public.meta_evaluation_rules where account_id=$1`,[accountId]);
+ const ruleMap:Partial<Record<Objective,EvaluationRule>>={};for(const r of rules.rows)ruleMap[r.objective as Objective]={minSpend:Number(r.min_spend),minResults:Number(r.min_results),target:Number(r.target),warningMarginPct:Number(r.warning_margin_pct)};
+ const {groups,review}=groupInsights(run.rows,run.sheet);
+ const evaluated=groups.map(g=>({...g,ads:g.ads.map(a=>({ad_id:a.ad_id,ad_name:a.ad_name,spend:a.spend,reach:a.reach,actions:a.actions})),evaluation:evaluateMedia({objective:g.objective,spend:g.spend,results:g.results,reach:g.reach,complete:run.status==='complete'&&review.length===0,matched:true,rule:ruleMap[g.objective]??null})}));
+ return {run:{id:run.id,status:run.status,startedAt:run.started_at,finishedAt:run.finished_at,error:run.error_message,count:run.rows.length,since:run.since,until:run.until},groups:evaluated,review,rules:ruleMap,admin};
 }
